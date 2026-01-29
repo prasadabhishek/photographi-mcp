@@ -15,17 +15,21 @@ We believe that:
 *   **Application**: `photographi` (CLI + MCP Server)
 *   **Models**: YOLO12x (Subject Detection)
 
-### 2. Quickstart
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/photographi.git
-cd photographi
+### 2. Quickstart (Local Development)
+Since `photographi-mcp` depends on `photo-quality-analyzer-core`, you likely want to edit both simultaneously.
 
-# Install dependencies (including the local core library)
+```bash
+# 1. Clone both repositories side-by-side
+git clone https://github.com/yourusername/photo-quality-analyzer.git
+git clone https://github.com/yourusername/photographi.git
+
+# 2. Install the Core Library in editable mode
+cd photo-quality-analyzer
 pip install -e .
 
-# Run the integration test suite
-python tests/integration/master_test_suite.py
+# 3. Install the App in editable mode (linking to the local core)
+cd ../photographi
+pip install -e .
 ```
 
 ## 🧪 Testing Strategy

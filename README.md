@@ -70,7 +70,10 @@ flowchart TB
 # Install directly from source
 git clone https://github.com/yourusername/photographi.git
 cd photographi
-pip install -e .
+pip install .
+
+# OR install via PyPI (coming soon)
+pip install photographi-mcp
 ```
 
 *Prerequisites: Python 3.10+, `pip`, and a folder of photos to analyze.*
