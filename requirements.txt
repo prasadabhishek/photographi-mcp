@@ -1,0 +1,2 @@
+fastmcp
+photo-quality-analyzer-core @ git+https://github.com/prasadabhishek/photo-quality-analyzer.git

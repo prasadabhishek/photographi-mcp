@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photographi"
+version = "0.1.0"
+authors = [
+  { name="Abhishek Prasad" },
+]
+description = "Visual Intelligence Command Center: A Local Computer Vision Engine for Photo Libraries"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Multimedia :: Graphics :: Viewers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "fastmcp>=0.1.0",
+    "photo-quality-analyzer-core>=0.2.0",
+    "tqdm>=4.66.0"
+]
+
+[project.scripts]
+photographi = "server:main"
+
+[tool.setuptools]
+py-modules = ["server", "test_client"]
