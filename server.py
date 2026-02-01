@@ -24,6 +24,10 @@ logger = logging.getLogger("photographi-mcp")
 mcp = FastMCP("photographi")
 
 def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+    """
+    Core logic for analyzing a single photograph.
+    Bridges the fastmcp interface to the photo_quality_analyzer_core.
+    """
     if not os.path.exists(image_path):
         return {"error": f"File not found: {image_path}"}
     try:
@@ -33,6 +37,11 @@ def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subj
         return {"error": str(e)}
 
 def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+    """
+    Performs batch analysis on all supported image formats in a directory.
+    Limits the return size to prevent triggering API payload limits while 
+    performing full processing.
+    """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
     
@@ -78,6 +87,10 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
     return response
 
 def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+    """
+    Ranks images by their weighted technical quality score.
+    Ideal for 'burst-selection' workflows to find the sharpest/best-exposed frame.
+    """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
     
@@ -117,6 +130,16 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = N
     }
 
 def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: int = None, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+    """
+    Automated culling of low-quality photographs.
+    
+    Supports:
+    - 'move': Relocates low-quality shots to a 'culled_photos' folder.
+    - 'xmp': Creates sidecar files for Lightroom/Capture One with 'Rejected' labels.
+    - 'both': Performs both actions.
+    
+    Ensures RAW+JPEG pairs are treated as a single unit during the culling process.
+    """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": "Directory not found."}
         
