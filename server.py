@@ -12,8 +12,8 @@ from tqdm import tqdm
 from photo_quality_analyzer_core.analyzer import (
     evaluate_photo_quality,
     SUPPORTED_EXTENSIONS,
-    write_xmp_sidecar,
-    extract_palette,
+    create_xmp_sidecar,
+    generate_color_palette,
 )
 
 # Setup logging
@@ -25,8 +25,13 @@ mcp = FastMCP("photographi")
 
 def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
     """
-    Core logic for analyzing a single photograph.
-    Bridges the fastmcp interface to the photo_quality_analyzer_core.
+    Core engine bridge for single image assessment.
+    
+    This function acts as the primary adapter between the MCP tool interface 
+    and the core signal processing library. It handles absolute path validation 
+    and delegates heavy lifting to the `evaluate_photo_quality` pipeline.
+    
+    Ref: [analyzer.py:evaluate_photo_quality](file:///Users/abhishekprasad/workspace/photo-quality-analyzer/photo_quality_analyzer_core/analyzer.py)
     """
     if not os.path.exists(image_path):
         return {"error": f"File not found: {image_path}"}
@@ -36,11 +41,17 @@ def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subj
         logger.error(f"Error analyzing {image_path}: {e}")
         return {"error": str(e)}
 
-def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
     """
-    Performs batch analysis on all supported image formats in a directory.
-    Limits the return size to prevent triggering API payload limits while 
-    performing full processing.
+    Batch processing pipeline for directory-scale analysis.
+    
+    Implements a recursive search for all supported image formats. To maintain
+    responsive MCP communication, results are capped at 50, but full culling
+    functionality is available via the `cull_folder` tool.
+    
+    Design:
+    Uses `tqdm` for terminal progress tracking while running analysis in 
+    a single-threaded loop to prioritize local memory stability over raw speed.
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
@@ -86,10 +97,18 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
         
     return response
 
-def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
     """
-    Ranks images by their weighted technical quality score.
-    Ideal for 'burst-selection' workflows to find the sharpest/best-exposed frame.
+    Burst-selection Intelligence: Finding the sharpest needle in the haystack.
+    
+    Science:
+    Sorts files by the `overallConfidence` score, which is a weighted sum 
+    of technical execution (Exposure, Sharpness, Noise) and aesthetic 
+    composition.
+    
+    Workflow:
+    Ideal for photographers who shoot in 'Burst Mode' and need the single 
+    best-executed frame from a high-speed sequence.
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
@@ -131,14 +150,20 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = N
 
 def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: int = None, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
     """
-    Automated culling of low-quality photographs.
+    Automated Content Culling and Asset Management.
     
-    Supports:
-    - 'move': Relocates low-quality shots to a 'culled_photos' folder.
-    - 'xmp': Creates sidecar files for Lightroom/Capture One with 'Rejected' labels.
-    - 'both': Performs both actions.
+    Decision Logic:
+    1. Every photo is evaluated using the full technical + aesthetic pipeline.
+    2. Any photo with an `overallConfidence` below the `threshold` is flagged.
     
-    Ensures RAW+JPEG pairs are treated as a single unit during the culling process.
+    Action Modes:
+    - `move`: Physically relocates rejected shots to a `culled_photos` folder.
+    - `xmp`: Generates XMP sidecars with "Rejected" labels (Safe path).
+    - `both`: Performs relocation and metadata tagging.
+    
+    Science of 'Keep Best N':
+    Ensures that even in a low-quality burst, the top N frames are preserved, 
+    preventing over-aggressive data loss.
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": "Directory not found."}
@@ -174,7 +199,7 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
         for img in rejects:
             status_actions = []
             if mode in ["xmp", "both"]:
-                write_xmp_sidecar(img["path"], rating=0, label="Rejected")
+                create_xmp_sidecar(img["path"], "Rejected", img["score"])
                 status_actions.append("XMP-Tagged")
             if mode in ["move", "both"]:
                 try:
@@ -243,9 +268,16 @@ def photographi_get_color_palette(
     image_path: Annotated[str, Field(description="Absolute path to image.")],
     colors: int = 5
 ) -> dict:
-    """Extracts dominant hex color palette from an image."""
+    """
+    Extracts a representative color palette from an image.
+    
+    Science:
+    Uses K-Means clustering in RGB space to identify dominant color clusters.
+    Returns: {"colors": ["#hex1", "#hex2", ...]}
+    """
     if not os.path.exists(image_path): return {"error": "File not found."}
-    return {"palette": extract_palette(image_path, colors)}
+    palette = generate_color_palette(image_path, colors)
+    return {"colors": palette}
 
 if __name__ == "__main__":
     mcp.run()
