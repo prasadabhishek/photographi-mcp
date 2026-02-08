@@ -1,8 +1,14 @@
-import gc
-import json
-import logging
+# photographi: MCP Server
+# Part of the photographi visual intelligence engine.
+# License: MIT
 import os
 import shutil
+import argparse
+import time
+
+__version__ = "0.1.0"
+import logging
+import gc
 from typing import Annotated, Literal
 
 from pydantic import Field
@@ -15,6 +21,7 @@ from photo_quality_analyzer_core.analyzer import (
     create_xmp_sidecar,
     generate_color_palette,
 )
+from analytics import analytics
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -26,18 +33,59 @@ mcp = FastMCP("photographi")
 def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
     """
     Core engine bridge for single image assessment.
-    
-    This function acts as the primary adapter between the MCP tool interface 
-    and the core signal processing library. It handles absolute path validation 
-    and delegates heavy lifting to the `evaluate_photo_quality` pipeline.
-    
-    Ref: [analyzer.py:evaluate_photo_quality](file:///Users/abhishekprasad/workspace/photo-quality-analyzer/photo_quality_analyzer_core/analyzer.py)
     """
     if not os.path.exists(image_path):
+        analytics.track_error()
         return {"error": f"File not found: {image_path}"}
+        
+    # Resolve relocated model path
+    model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "models")
+    model_filename = "yolo11n.pt" if model_size == "nano" else "yolo12x.pt"
+    full_model_path = os.path.join(model_dir, model_filename)
+    
+    # Check if we have a local model, otherwise fallback to name-only for potential download
+    if os.path.exists(full_model_path):
+        model_size_or_path = full_model_path
+    else:
+        model_size_or_path = model_size
+
+    # Track tool invocation already handled in wrapper, 
+    # but we track specific technical details here
+    format_ext = os.path.splitext(image_path)[1]
+    
+    start_time = time.time()
     try:
-        return evaluate_photo_quality(image_path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+        # We don't have a direct way to measure "load time" separately here 
+        # because evaluate_photo_quality handles it internally, but we can 
+        # measure the total processing hit.
+        res = evaluate_photo_quality(image_path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size_or_path)
+        end_time = time.time()
+        
+        # Track Performance
+        analytics.track_performance((end_time - start_time) * 1000)
+        
+        # Track Extensive Results
+        cam_info = res.get("cameraInfo", {})
+        analytics.track_analysis_results(
+            judgement=res.get("judgement", "Unknown"), 
+            format_ext=format_ext, 
+            model_size=model_size,
+            technical_score=res.get("technicalScore", 0),
+            aesthetic_score=res.get("aestheticScore", 0),
+            overall_score=res.get("overallConfidence", 0),
+            camera_make=cam_info.get("make"),
+            camera_model=cam_info.get("model"),
+            lens_model=cam_info.get("lens")
+        )
+        if enable_subject_detection:
+            analytics.track_feature_usage("subject_detection")
+            
+        # Trigger remote transmission attempt
+        analytics.transmit_telemetry()
+        return res
     except Exception as e:
+        error_name = type(e).__name__
+        analytics.track_error(error_name)
         logger.error(f"Error analyzing {image_path}: {e}")
         return {"error": str(e)}
 
@@ -67,9 +115,30 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
     
     for i, filename in enumerate(tqdm(image_files, desc="Analyzing folder")):
         image_path = os.path.join(folder_path, filename)
+        format_ext = os.path.splitext(image_path)[1]
+        start_time = time.time()
         try:
             result = evaluate_photo_quality(image_path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+            end_time = time.time()
+            
             total_confidence += result["overallConfidence"]
+            
+            # Performance & Extensive Tracking
+            cam_info = result.get("cameraInfo", {})
+            analytics.track_performance((end_time - start_time) * 1000)
+            analytics.track_analysis_results(
+                judgement=result.get("judgement", "Unknown"),
+                format_ext=format_ext,
+                model_size=model_size,
+                technical_score=result.get("technicalScore", 0),
+                aesthetic_score=result.get("aestheticScore", 0),
+                overall_score=result.get("overallConfidence", 0),
+                camera_make=cam_info.get("make"),
+                camera_model=cam_info.get("model"),
+                lens_model=cam_info.get("lens")
+            )
+            if enable_subject_detection:
+                analytics.track_feature_usage("subject_detection")
             
             # Only add to detailed results if within limit
             if i < max_return:
@@ -79,6 +148,7 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
                     "summary": result.get("reasoning", {}).get("technical", "Good.")
                 }
         except Exception as e:
+            analytics.track_error()
             if i < max_return:
                 results[filename] = {"error": str(e)}
         gc.collect()
@@ -91,6 +161,9 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
         "averageConfidence": avg_conf,
         "sampleResults": results
     }
+    
+    # Trigger remote transmission attempt
+    analytics.transmit_telemetry()
     
     if len(image_files) > max_return:
         response["note"] = f"Showing first {max_return} of {len(image_files)} images. Request a ranking or specific file analysis for more."
@@ -120,8 +193,12 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = N
     scored_images = []
     for filename in image_files:
         path = os.path.join(folder_path, filename)
+        format_ext = os.path.splitext(path)[1]
+        start_time = time.time()
         try:
             res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+            end_time = time.time()
+            
             scored_images.append({
                 "filename": filename,
                 "score": round(res["overallConfidence"], 3),
@@ -138,14 +215,131 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = N
                     "focus": round(res.get("metrics", {}).get("focus", {}).get("score", 0), 2) if "focus" in res.get("metrics", {}) else None
                 }
             })
-        except: continue
+            
+            # Performance & Extensive Tracking
+            cam_info = res.get("cameraInfo", {})
+            analytics.track_performance((end_time - start_time) * 1000)
+            analytics.track_analysis_results(
+                judgement=res.get("judgement", "Unknown"),
+                format_ext=format_ext,
+                model_size=model_size,
+                technical_score=res.get("technicalScore", 0),
+                aesthetic_score=res.get("aestheticScore", 0),
+                overall_score=res.get("overallConfidence", 0),
+                camera_make=cam_info.get("make"),
+                camera_model=cam_info.get("model"),
+                lens_model=cam_info.get("lens")
+            )
+            if enable_subject_detection:
+                analytics.track_feature_usage("subject_detection")
+
+        except Exception as e:
+            analytics.track_error(type(e).__name__)
+            logger.error(f"Failed to rank {filename}: {e}")
+            continue
         gc.collect()
             
     scored_images.sort(key=lambda x: x["score"], reverse=True)
+    # Trigger remote transmission attempt after batch
+    analytics.transmit_telemetry()
     return {
         "status": "Ranking Complete", 
         "totalImagesScanned": len(image_files), 
         "bestImages": scored_images[:top_n]
+    }
+
+def _threshold_cull_logic(folder_path: str, min_confidence: float = 0.6, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+    """
+    Binary culling based on strict confidence threshold.
+    
+    Workflow:
+    Unlike qualitative culling (Good/Fair/Poor), this uses a deterministic
+    numerical threshold. Images >= min_confidence go to 'selects/', 
+    others to 'rejects/'.
+    
+    Ideal for: High-volume shoots where you want binary decisions
+    (e.g., "Keep anything above 0.7").
+    """
+    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+        return {"error": "Directory not found."}
+        
+    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")]
+    if not image_files:
+        return {"message": "No images found."}
+        
+    selects_dir = os.path.join(folder_path, "selects")
+    rejects_dir = os.path.join(folder_path, "rejects")
+    
+    if mode in ["move", "both"]:
+        os.makedirs(selects_dir, exist_ok=True)
+        os.makedirs(rejects_dir, exist_ok=True)
+    
+    selects = []
+    rejects = []
+    
+    for filename in tqdm(image_files, desc="Threshold culling"):
+        path = os.path.join(folder_path, filename)
+        format_ext = os.path.splitext(path)[1]
+        start_time = time.time()
+        try:
+            res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+            end_time = time.time()
+            confidence = res["overallConfidence"]
+            
+            # Performance & Extensive Tracking
+            cam_info = res.get("cameraInfo", {})
+            analytics.track_performance((end_time - start_time) * 1000)
+            analytics.track_analysis_results(
+                judgement=res.get("judgement", "Unknown"),
+                format_ext=format_ext,
+                model_size=model_size,
+                technical_score=res.get("technicalScore", 0),
+                aesthetic_score=res.get("aestheticScore", 0),
+                overall_score=res.get("overallConfidence", 0),
+                camera_make=cam_info.get("make"),
+                camera_model=cam_info.get("model"),
+                lens_model=cam_info.get("lens")
+            )
+            if enable_subject_detection:
+                analytics.track_feature_usage("subject_detection")
+
+            target_list = selects if confidence >= min_confidence else rejects
+            target_dir = selects_dir if confidence >= min_confidence else rejects_dir
+            
+            actions = []
+            if mode in ["xmp", "both"]:
+                status = "Keep" if confidence >= min_confidence else "Rejected"
+                create_xmp_sidecar(path, status, confidence)
+                actions.append("XMP-Tagged")
+                analytics.track_feature_usage("xmp_sidecar")
+                
+            if mode in ["move", "both"]:
+                try:
+                    dest = os.path.join(target_dir, filename)
+                    shutil.move(path, dest)
+                    xmp_path = os.path.splitext(path)[0] + ".xmp"
+                    if os.path.exists(xmp_path):
+                        shutil.move(xmp_path, os.path.join(target_dir, os.path.basename(xmp_path)))
+                    actions.append("Moved")
+                except Exception as e:
+                    logger.error(f"Failed to move {filename}: {e}")
+                    actions.append("Move-Failed")
+                    
+            target_list.append({"filename": filename, "score": round(confidence, 3), "actions": actions})
+            
+        except Exception as e:
+            logger.error(f"Failed to analyze {filename}: {e}")
+            continue
+        gc.collect()
+    
+    return {
+        "status": "Threshold Culling Complete",
+        "threshold": min_confidence,
+        "totalImagesScanned": len(image_files),
+        "selectsCount": len(selects),
+        "rejectsCount": len(rejects),
+        "selects": selects[:10],  # Sample
+        "rejects": rejects[:10]   # Sample
     }
 
 def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: int = None, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
@@ -175,10 +369,33 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
     scored_images = []
     for filename in tqdm(image_files, desc="Visual intelligence analysis"):
         path = os.path.join(folder_path, filename)
+        format_ext = os.path.splitext(path)[1]
+        start_time = time.time()
         try:
             res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
-            scored_images.append({"filename": filename, "path": path, "score": res["overallConfidence"]})
+            end_time = time.time()
+            
+            scored_images.append({"filename": filename, "path": path, "score": res["overallConfidence"], "judgement": res.get("judgement", "Unknown")})
+            
+            # Performance & Extensive Tracking
+            cam_info = res.get("cameraInfo", {})
+            analytics.track_performance((end_time - start_time) * 1000)
+            analytics.track_analysis_results(
+                judgement=res.get("judgement", "Unknown"),
+                format_ext=format_ext,
+                model_size=model_size,
+                technical_score=res.get("technicalScore", 0),
+                aesthetic_score=res.get("aestheticScore", 0),
+                overall_score=res.get("overallConfidence", 0),
+                camera_make=cam_info.get("make"),
+                camera_model=cam_info.get("model"),
+                lens_model=cam_info.get("lens")
+            )
+            if enable_subject_detection:
+                analytics.track_feature_usage("subject_detection")
+
         except Exception as e:
+            analytics.track_error(type(e).__name__)
             logger.error(f"Failed to analyze {filename}: {e}")
             continue
         gc.collect()
@@ -201,6 +418,7 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
             if mode in ["xmp", "both"]:
                 create_xmp_sidecar(img["path"], "Rejected", img["score"])
                 status_actions.append("XMP-Tagged")
+                analytics.track_feature_usage("xmp_sidecar")
             if mode in ["move", "both"]:
                 try:
                     dest = os.path.join(culled_dir, img["filename"])
@@ -224,34 +442,50 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
 
 @mcp.tool()
 def photographi_analyze_photo(
-    image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG.")],
-    metrics: Annotated[list[str], Field(description="Metrics (e.g. ['sharpness']).")] = None,
-    enable_subject_detection: bool = True,
-    model_size: str = "nano"
+    image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")],
+    metrics: Annotated[list[str], Field(description="Optional: specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition). Defaults to all.")] = None,
+    enable_subject_detection: Annotated[bool, Field(description="Enables YOLOv11 for Subject-Aware Metering and ROI focus analysis.")] = True,
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size. 'nano' is sub-second; 'xlarge' is studio-grade.")] = "nano"
 ) -> dict:
-    """Performs technical quality analysis on a single photo."""
-    return _analyze_photo_logic(image_path, metrics, enable_subject_detection, model_size)
+    """
+    Performs Studio-Grade technical analysis on a single photo.
+    
+    Science:
+    - Exposure: Evaluated via the Ansel Adams Zone System.
+    - Sharpness: Lens-aware calculation with Diffraction Limited Aperture (DLA) detection.
+    - AI Context: Uses Subject-Aware Metering to prioritize detected faces/objects.
+    """
+    analytics.track_tool_invocation("photographi_analyze_photo")
+    return _analyze_photo_logic(image_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
 
 @mcp.tool()
 def photographi_analyze_folder(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
-    metrics: list[str] = None,
+    metrics: Annotated[list[str], Field(description="Metrics to calculate.")] = None,
     enable_subject_detection: bool = True,
-    model_size: str = "nano"
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano"
 ) -> dict:
-    """Batch analyzes an entire folder. Returns sample results."""
-    return _analyze_folder_logic(folder_path, metrics, enable_subject_detection, model_size)
+    """
+    Batch analyzes an entire folder. 
+    Returns a technical sample of results. Use for quick library auditing.
+    """
+    analytics.track_tool_invocation("photographi_analyze_folder")
+    return _analyze_folder_logic(folder_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
 
 @mcp.tool()
 def photographi_rank_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
-    top_n: int = 1,
+    top_n: Annotated[int, Field(description="Number of top-rated images to return.")] = 1,
     metrics: list[str] = None,
     enable_subject_detection: bool = True,
-    model_size: str = "nano"
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano"
 ) -> dict:
-    """Ranks photos by technical quality. Use for finding the best shot in a burst."""
-    return _rank_folder_logic(folder_path, top_n, metrics, enable_subject_detection, model_size)
+    """
+    Burst Intelligence: Ranks photos by technical quality. 
+    Use this to find the single sharpest, best-exposed frame in a high-speed sequence.
+    """
+    analytics.track_tool_invocation("photographi_rank_photographs")
+    return _rank_folder_logic(folder_path, top_n=top_n, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
 
 @mcp.tool()
 def photographi_cull_photographs(
@@ -264,20 +498,43 @@ def photographi_cull_photographs(
     return _cull_folder_logic(folder_path, threshold, mode=mode, enable_subject_detection=enable_subject_detection)
 
 @mcp.tool()
+def photographi_threshold_cull(
+    folder_path: Annotated[str, Field(description="Absolute path to folder.")],
+    min_confidence: Annotated[float, Field(
+        description="Minimum confidence threshold (0.0-1.0). Images below this are rejected.",
+        ge=0.0,
+        le=1.0
+    )] = 0.6,
+    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull mode.")] = "move",
+    enable_subject_detection: bool = True
+) -> dict:
+    """Binary culling: sorts into 'selects/' (>= threshold) and 'rejects/' (< threshold)."""
+    return _threshold_cull_logic(folder_path, min_confidence, mode, enable_subject_detection=enable_subject_detection)
+
+@mcp.tool()
 def photographi_get_color_palette(
     image_path: Annotated[str, Field(description="Absolute path to image.")],
     colors: int = 5
 ) -> dict:
     """
-    Extracts a representative color palette from an image.
-    
-    Science:
-    Uses K-Means clustering in RGB space to identify dominant color clusters.
-    Returns: {"colors": ["#hex1", "#hex2", ...]}
+    Extracts a representative color palette using K-Means Clustering.
     """
-    if not os.path.exists(image_path): return {"error": "File not found."}
+    analytics.track_tool_invocation("photographi_get_color_palette")
     palette = generate_color_palette(image_path, colors)
+    analytics.track_feature_usage("color_palette")
     return {"colors": palette}
 
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Photographi MCP Server")
+    parser.add_argument("--telemetry-endpoint", help="Remote telemetry collection URL")
+    parser.add_argument("--disable-telemetry", action="store_true", help="Disable all local and remote analytics")
+    args, unknown = parser.parse_known_args()
+    
+    # Configure analytics from CLI args
+    analytics.configure(
+        endpoint=args.telemetry_endpoint,
+        disabled=True if args.disable_telemetry else None
+    )
+    
     mcp.run()

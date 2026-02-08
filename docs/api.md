@@ -4,14 +4,15 @@ This document provides a detailed breakdown of every tool exposed by the **photo
 
 ---
 
-## `analyze_photo`
-Analyzes a single image file for technical and aesthetic quality.
+## `photographi_analyze_photo`
+Performs Studio-Grade technical analysis on a single photo.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `image_path` | `str` | *Required* | Absolute path to the image or RAW file. |
-| `metrics` | `list[str]` | `None` | Optional subset of metrics: `sharpness`, `focus`, `exposure`, `noise`, `color`, `dynamicRange`, `composition`. |
-| `enable_subject_detection` | `bool` | `true` | If `false`, YOLO detection is skipped for high speed. |
+| `image_path` | `str` | *Required* | Absolute path to RAW, JPEG, or TIFF. |
+| `metrics` | `list[str]` | `None` | Optional subset: `sharpness`, `exposure`, `noise`, `focus`, `color`, `dynamicRange`, `composition`. |
+| `enable_subject_detection` | `bool` | `true` | Enables YOLO for Subject-Aware Metering. |
+| `model_size` | `str` | `"nano"` | `"nano"` (fast, <1s) or `"xlarge"` (ultra-precise). |
 
 **Example Response**:
 ```json
@@ -25,41 +26,57 @@ Analyzes a single image file for technical and aesthetic quality.
 
 ---
 
-## `analyze_folder`
-Bulk analysis of all supported images in a directory.
+## `photographi_analyze_folder`
+Batch processes an entire folder. Returns a statistical sample (capped at 50 for performance).
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path to the directory. |
 | `metrics` | `list[str]` | `None` | Same as `analyze_photo`. |
 | `enable_subject_detection` | `bool` | `true` | Same as `analyze_photo`. |
+| `model_size` | `str` | `"nano"` | `"nano"` or `"xlarge"`. |
 
 ---
 
-## `rank_folder`
-Finds the cream of the crop in a directory.
+## `photographi_rank_photographs`
+Ranks a group of photos by `overallConfidence`. Ideal for finding the "keeper" in a burst sequence.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path to the directory. |
 | `top_n` | `int` | `10` | The number of top-scored images to return. |
+| `metrics` | `list[str]` | `None` | Optional metric subset. |
+| `enable_subject_detection` | `bool` | `true` | If true, prioritizes sharp eyes/faces. |
+| `model_size` | `str` | `"nano"` | `"nano"` or `"xlarge"`. |
 
 ---
 
-## `cull_folder`
-The master cleanup tool for professional photographers.
+## `photographi_threshold_cull`
+Binary culling: Sorts images based on a strict numerical quality threshold.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `folder_path` | `str` | *Required* | Absolute path to the directory. |
+| `min_confidence` | `float` | `0.6` | Images >= this score go to `selects/`. Others to `rejects/`. |
+| `mode` | `str` | `"move"` | `"move"` (physically move files), `"xmp"` (tag metadata), or `"both"`. |
+| `enable_subject_detection` | `bool` | `true` | If true, prioritized sharp eyes/faces. |
+
+---
+
+## `photographi_cull_photographs`
+Qualitative culling: Filters low-quality assets into a `culled_photos/` subfolder.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path. |
-| `threshold` | `float` | `0.4` | Scores below this are rejected. |
-| `keep_best_n` | `int` | `None` | If set, overrides `threshold` to keep exactly the Top N. |
-| `mode` | `str` | `"xmp"` | `"xmp"`, `"move"`, or `"both"`. |
+| `threshold` | `float` | `0.4` | Scores below this are considered "junk". |
+| `mode` | `str` | `"move"` | `"move"`, `"xmp"`, or `"both"`. |
+| `enable_subject_detection` | `bool` | `true` | If true, prioritized sharp eyes/faces. |
 
 ---
 
-## `get_color_palette`
-Extracts dominant colors from an image.
+## `photographi_get_color_palette`
+Extracts a K-Means color story (Hex codes) for style analysis.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |

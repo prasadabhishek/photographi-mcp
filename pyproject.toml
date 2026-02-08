@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=0.1.0",
-    "photo-quality-analyzer-core>=0.2.0",
+    "photo-quality-analyzer-core>=0.6.0",
     "tqdm>=4.66.0"
 ]
 

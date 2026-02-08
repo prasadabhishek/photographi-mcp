@@ -37,6 +37,7 @@ ENV/
 yolo*.pt
 *.engine
 *.onnx
+resources/models/
 
 # Test Data / Local Env
 master_test_env/
@@ -46,3 +47,6 @@ test_data/
 culled_photos/
 *.xmp
 *.log
+
+# Internal Ops & Docs
+ops/

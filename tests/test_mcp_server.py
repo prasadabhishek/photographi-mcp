@@ -22,7 +22,7 @@ class TestAnalyzerJudgementGeneration(unittest.TestCase):
         # Use actual test assets from local_test_assets
         test_image = os.path.abspath(os.path.join(
             os.path.dirname(__file__), 
-            '../local_test_assets/DSC00504.ARW'
+            'assets/DSC00504.ARW'
         ))
         if not os.path.exists(test_image):
             self.skipTest(f"Test image not found: {test_image}")
@@ -42,7 +42,7 @@ class TestAnalyzerJudgementGeneration(unittest.TestCase):
         """Verify that judgement levels match confidence scores correctly."""
         test_image = os.path.abspath(os.path.join(
             os.path.dirname(__file__), 
-            '../local_test_assets/DSC00504.ARW'
+            'assets/DSC00504.ARW'
         ))
         if not os.path.exists(test_image):
             self.skipTest(f"Test image not found: {test_image}")
@@ -72,7 +72,7 @@ class TestMCPServerRanking(unittest.TestCase):
         """Verify that rank results include detailed summaries."""
         test_folder = os.path.abspath(os.path.join(
             os.path.dirname(__file__), 
-            '../local_test_assets'
+            'assets'
         ))
         if not os.path.exists(test_folder):
             self.skipTest(f"Test folder not found: {test_folder}")
@@ -100,7 +100,7 @@ class TestMCPServerRanking(unittest.TestCase):
         """Verify that images are ranked from best to worst by score."""
         test_folder = os.path.abspath(os.path.join(
             os.path.dirname(__file__), 
-            '../local_test_assets'
+            'assets'
         ))
         if not os.path.exists(test_folder):
             self.skipTest(f"Test folder not found: {test_folder}")
@@ -120,7 +120,7 @@ class TestMCPServerAnalysis(unittest.TestCase):
         """Verify that analyze_photo returns all expected fields."""
         test_image = os.path.abspath(os.path.join(
             os.path.dirname(__file__), 
-            '../local_test_assets/DSC00504.ARW'
+            'assets/DSC00504.ARW'
         ))
         if not os.path.exists(test_image):
             self.skipTest(f"Test image not found: {test_image}")

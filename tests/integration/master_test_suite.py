@@ -6,18 +6,18 @@ from server import (
     _analyze_photo_logic, 
     _analyze_folder_logic, 
     _rank_folder_logic, 
-    _cull_folder_logic,
-    get_color_palette
+    _cull_folder_logic
 )
+from photo_quality_analyzer_core.analyzer import generate_color_palette as get_color_palette
 
 # Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEST_DIR = os.path.join(BASE_DIR, "master_test_env")
 # Using images from existing test folders within the repo
-RAW_IMAGE = os.path.join(BASE_DIR, "tests", "workflow", "culling", "good_image.png") 
-S_IMAGE = os.path.join(BASE_DIR, "tests", "data", "sharp_test.png")
-B_IMAGE = os.path.join(BASE_DIR, "tests", "data", "blurry_test.png")
-N_IMAGE = os.path.join(BASE_DIR, "tests", "data", "noise_test.png")
+RAW_IMAGE = os.path.join(BASE_DIR, "tests", "assets", "good_image.png") 
+S_IMAGE = os.path.join(BASE_DIR, "tests", "assets", "sharp_test.png")
+B_IMAGE = os.path.join(BASE_DIR, "tests", "assets", "blurry_test.png")
+N_IMAGE = os.path.join(BASE_DIR, "tests", "assets", "noise_test.png")
 
 def setup_env():
     if os.path.exists(TEST_DIR):
@@ -43,7 +43,8 @@ def run_test(name, func, *args, **kwargs):
             if "overallConfidence" in res:
                  print(f"   Score: {res['overallConfidence']:.2f} ({res['judgement']})")
             if "culledCount" in res:
-                 print(f"   Culled: {res['culledCount']}/{res['totalImages']}")
+                 total = res.get('totalImagesScanned', res.get('totalImages', 0))
+                 print(f"   Culled: {res['culledCount']}/{total}")
     except Exception as e:
         print(f"🔥 Crash: {e}")
 
@@ -81,8 +82,9 @@ def test_all_combinations():
              TEST_DIR, threshold=0.5, mode="both", enable_subject_detection=False)
 
     # 9. Aesthetic Tools
-    from photo_quality_analyzer_core.analyzer import extract_palette
-    run_test("Color Palette", extract_palette, os.path.join(TEST_DIR, "img_sharp.png"), num_colors=3)
+    setup_env()
+    from photo_quality_analyzer_core.analyzer import generate_color_palette
+    run_test("Color Palette", generate_color_palette, os.path.join(TEST_DIR, "img_sharp.png"), num_colors=3)
 
     # 10. Edge Case: Missing File
     run_test("Edge Case: Missing File", _analyze_photo_logic, "non_existent.jpg")

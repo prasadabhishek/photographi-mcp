@@ -1,6 +1,6 @@
 # Architecture: The Visual Intelligence Engine
 
-`photographi` is not a script; it is a modular **Computer Vision Engine** designed to understand photograph quality through deep signal processing and neural networks.
+`photographi-mcp` is a modular **Computer Vision Engine** designed to understand photograph quality through deep signal processing and neural networks.
 
 ## 🏗️ High-Level Design
 
@@ -8,56 +8,59 @@ The system operates in a strictly local pipeline, transforming raw pixels into s
 
 ```mermaid
 flowchart TD
-    Ingest[RAW Ingest Layer] -->|Decode| Physics[Physics Engine]
-    Ingest -->|Decode| Neural[Neural Engine]
+    Ingest[RAW Ingest Layer] -->|Decode| Core["Core Engine (photo-quality-analyzer-core)"]
     
-    subgraph "Physics Engine (Signal Processing)"
-        Physics -->|FFT| Sharpness[Sharpness Monitor]
-        Physics -->|Histograms| Exposure[Zone System Analyzer]
-        Physics -->|Variance| Noise[ISO Noise Profiler]
+    subgraph "Core Engine"
+        Core -->|FFT| Physics["Physics (Signal Processing)"]
+        Core -->|Inference| Neural["Neural (YOLO11n/x)"]
+        Physics -->|Metrics| Fusion[Decision Fusion]
+        Neural -->|Context| Fusion
     end
     
-    subgraph "Neural Engine (YOLO12x)"
-        Neural -->|Inference| Detection[Subject Detection]
-        Detection -->|Context| Composition[Rule of Thirds]
+    Fusion -->|JSON| Server[MCP Server]
+    
+    subgraph "Privacy-First Telemetry"
+        Server -->|Anonymized Metrics| Analytics[Local Analytics Manager]
+        Analytics -->|Secure Proxy| Relay[Cloudflare Relay]
+        Relay -->|Ingest| Axiom[Axiom Data]
     end
     
-    Physics -->|Metrics| Fusion[Decision Fusion Layer]
-    Neural -->|Context| Fusion
-    
-    Fusion -->|Judgement| App[Application Layer]
-    
-    subgraph "Application Layer"
-        App -->|MCP| Search[Semantic Search]
-        App -->|CLI| Audit[Library Audit]
-        App -->|XMP| Cull[Smart Culling]
-    end
+    Server -->|Tools| LLM["AI Agent (Claude)"]
 ```
 
 ---
 
-## 1. The Physics Engine (Signal Processing)
-This layer deals with the "objective reality" of the image using mathematical transforms.
+## 1. The Core Engine
+The heavy lifting is delegated to **[photo-quality-analyzer-core](https://pypi.org/project/photo-quality-analyzer-core/)**. This ensures a clean separation between the MCP protocol logic and the underlying computer vision science.
 
-*   **FFT Sharpness**: We use the *Moments of the Magnitude Spectrum* in the frequency domain. This is robust against image noise and rotation, unlike simple Laplacian variance.
-*   **Zone System Exposure**: Inspired by Ansel Adams, we analyze luminance histograms to detect *clipping* in critical zones (0 and 10) rather than just "brightness."
-*   **Noise Profiling**: We calculate local variance in smooth patches to estimate the sensor's noise floor, distinguishing between "grainy" and "detailed."
+### A. Physics (Signal Processing)
+*   **FFT Sharpness**: Moments of the Magnitude Spectrum for rotation-invariant sharpness.
+*   **Zone System Exposure**: Luminance histograms analysis for clipping and crush detection.
+*   **Noise Profiling**: Local variance calculation to estimate sensor noise floors.
 
-## 2. The Neural Engine (Context)
-This layer understands "what" is in the image to provide context to the physics.
+### B. Neural (Context)
+*   **Dual-Model Architecture**:
+    *   **YOLO11n (Nano)**: Sub-second inference for rapid culling.
+    *   **YOLO11x (XLarge)**: Studio-grade precision for critical audits.
+*   **Subject-Awareness**: Metrics are weighted based on detected subjects (e.g., focus on eyes > background).
 
-*   **Subject Detection**: We run **YOLO12x** locally to identify People, Animals, and Cars.
-*   **Contextual Weighting**: If a person is detected, the Sharpness score is weighted heavily on the *face/eyes*. If it's a landscape, the score is averaged across the frame.
-*   **Composition**: Usage of the Rule of Thirds is calculated based on the bounding box centroids of detected subjects.
+---
 
-## 3. The Decision Fusion Layer
-Raw numbers (e.g., "Sharpness: 0.04") are meaningless to a human. This layer maps metrics to judgements.
+## 2. Privacy-First Telemetry
+We implement a "Trustless" architecture for usage metrics.
 
-*   **Thresholds**: Dynamic thresholds based on EXIF data (e.g., we forgive motion blur if `Shutter Speed < 1/30` as "Artistic Intent").
-*   **Confidence**: A composite score (0.0 - 1.0) representing the engine's certainty that a photo is technically technically sound.
+1.  **Local Aggregation**: [`analytics.py`](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/analytics.py) maintains a local JSON registry of counts and anonymous quality scores.
+2.  **No PII**: We intentionally do not collect filenames, paths, or EXIF serial numbers.
+3.  **Secure Relay**:
+    *   The open-source code **does not** contain API keys.
+    *   Data is sent to a **[Cloudflare Worker Relay](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry_relay.js)** (proxy).
+    *   The Relay injects the secret Axiom Token, ensuring the keys never live on the user's machine.
 
-## 4. The Application Layer (MCP)
-The engine exposes its understanding via the **Model Context Protocol (MCP)**, allowing AI agents to query the library:
+---
 
-*   **ReadResource**: `photographi://analyze/path/to/folder` returns a JSON report.
-*   **CallTool**: `analyze_photo` allows an agent to request processing on demand.
+## 3. The MCP Layer
+The server exposes high-level tools (not resources) to the AI Agent.
+
+*   **`photographi_analyze_photo`**: The primary atomic unit of work.
+*   **`photographi_analyze_folder`**: A statistical sampling wrapper.
+*   **`photographi_cull_photographs`**: An orchestrated workflow that combines analysis with filesystem actions.
