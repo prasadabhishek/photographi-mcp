@@ -14,9 +14,9 @@ from typing import Annotated, Literal
 from pydantic import Field
 from fastmcp import FastMCP
 from tqdm import tqdm
-
 from photo_quality_analyzer_core.analyzer import (
     evaluate_photo_quality,
+    detect_objects,
     SUPPORTED_EXTENSIONS,
     create_xmp_sidecar,
     generate_color_palette,
@@ -444,8 +444,8 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
 def photographi_analyze_photo(
     image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")],
     metrics: Annotated[list[str], Field(description="Optional: specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition). Defaults to all.")] = None,
-    enable_subject_detection: Annotated[bool, Field(description="Enables YOLOv11 for Subject-Aware Metering and ROI focus analysis.")] = True,
-    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size. 'nano' is sub-second; 'xlarge' is studio-grade.")] = "nano"
+    enable_subject_detection: Annotated[bool, Field(description="Enables YOLO26 for Subject-Aware Metering, ROI focus analysis, and scene content labeling.")] = True,
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size. 'nano' is sub-second.")] = "nano"
 ) -> dict:
     """
     Performs Studio-Grade technical analysis on a single photo.
@@ -524,8 +524,90 @@ def photographi_get_color_palette(
     analytics.track_feature_usage("color_palette")
     return {"colors": palette}
 
+@mcp.tool()
+def photographi_get_scene_content(
+    image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")]
+) -> dict:
+    """
+    Returns a clean list of detected objects (e.g., person, dog, car).
+    Use this for quick scene indexing without full technical analysis.
+    """
+    analytics.track_tool_invocation("photographi_get_scene_content")
+    try:
+        objects = detect_objects(image_path)
+        analytics.track_feature_usage("scene_content")
+        return {"objects": objects}
+    except Exception as e:
+        logger.error(f"Failed to get scene content: {e}")
+        return {"error": str(e)}
 
-if __name__ == "__main__":
+def _bulk_palette_logic(folder_path: str, colors: int = 5, limit: int = 20, offset: int = 0) -> dict:
+    """
+    Batch color palette extraction with pagination.
+    """
+    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+        return {"error": f"Directory not found: {folder_path}"}
+        
+    image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
+    if not image_files:
+        return {"message": "No images found."}
+
+    # Apply pagination
+    total_images = len(image_files)
+    paginated_files = image_files[offset : offset + limit]
+    
+    if not paginated_files:
+        return {
+            "message": "No more images in this range.",
+            "totalImages": total_images,
+            "nextOffset": None
+        }
+        
+    results = {}
+    
+    for filename in tqdm(paginated_files, desc="Extracting palettes"):
+        image_path = os.path.join(folder_path, filename)
+        try:
+            palette = generate_color_palette(image_path, colors)
+            results[filename] = palette
+            analytics.track_feature_usage("color_palette")
+        except Exception as e:
+            logger.error(f"Failed to extract palette for {filename}: {e}")
+            results[filename] = {"error": str(e)}
+            
+    analytics.transmit_telemetry()
+    
+    response = {
+        "status": "Palette Extraction Complete",
+        "totalImagesInFolder": total_images,
+        "returned": len(results),
+        "offset": offset,
+        "limit": limit,
+        "palettes": results
+    }
+
+    if offset + limit < total_images:
+        response["nextOffset"] = offset + limit
+        response["note"] = f"Showing images {offset + 1} to {offset + len(results)} of {total_images}. Use offset={offset+limit} for next batch."
+        
+    return response
+
+@mcp.tool()
+def photographi_get_folder_palettes(
+    folder_path: Annotated[str, Field(description="Absolute path to folder.")],
+    colors: int = 5,
+    limit: int = 20,
+    offset: int = 0
+) -> dict:
+    """
+    Extracts representative color palettes for a batch of images in a folder.
+    Supports pagination for large folders.
+    """
+    analytics.track_tool_invocation("photographi_get_folder_palettes")
+    return _bulk_palette_logic(folder_path, colors, limit, offset)
+
+
+def main():
     parser = argparse.ArgumentParser(description="Photographi MCP Server")
     parser.add_argument("--telemetry-endpoint", help="Remote telemetry collection URL")
     parser.add_argument("--disable-telemetry", action="store_true", help="Disable all local and remote analytics")
@@ -538,3 +620,6 @@ if __name__ == "__main__":
     )
     
     mcp.run()
+
+if __name__ == "__main__":
+    main()

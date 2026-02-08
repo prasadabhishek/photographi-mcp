@@ -28,4 +28,4 @@ dependencies = [
 photographi = "server:main"
 
 [tool.setuptools]
-py-modules = ["server", "test_client"]
+py-modules = ["server", "test_client", "analytics"]

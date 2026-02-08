@@ -66,6 +66,18 @@ Binary culling: Sorts images based on a strict numerical quality threshold.
 ## `photographi_cull_photographs`
 Qualitative culling: Filters low-quality assets into a `culled_photos/` subfolder.
 
+### `photographi_get_folder_palettes`
+Analyzes an entire folder and returns individual color palettes. Supports pagination.
+
+**Parameters:**
+- `folder_path` (string, required): Absolute path to the directory.
+- `colors` (integer, optional): Number of colors per palette. Default: 5.
+- `limit` (integer, optional): Max images to process per call. Default: 20.
+- `offset` (integer, optional): Starting index for pagination. Default: 0.
+
+**Example Prompt:**
+> "Extract 5-color palettes for the first 50 images in the 'vacation' folder."
+
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path. |
