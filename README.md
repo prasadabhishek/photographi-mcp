@@ -26,12 +26,24 @@ For the math and signal processing details, see the **[Technical Science Documen
 
 ## 🔌 Installation & Setup
 
-### Option 1: The Easy Way (pip)
+### Prerequisites
+
+1. Install the core library dependency:
+```bash
+pip install photo-quality-analyzer-core
+```
+
+2. Install the MCP server:
 ```bash
 pip install photographi-mcp
 ```
 
-**Claude Desktop Configuration** (Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`):
+---
+
+### Option A: Claude Desktop Integration
+
+**Configuration File**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+
 ```json
 {
   "mcpServers": {
@@ -43,32 +55,74 @@ pip install photographi-mcp
 }
 ```
 
-### Option 2: For Developers (Source)
-If you want to modify the code or contribute:
-
-1.  Clone this repository.
-2.  Install dependencies: `pip install -e .`
-3.  Point Claude to your local server:
-
+**For Development (Source Installation)**:
 ```json
 {
   "mcpServers": {
     "photographi": {
-      "command": "python3",
-      "args": ["/absolute/path/to/photographi/server.py"]
+      "command": "/Users/YOUR_USERNAME/workspace/photographi/venv/bin/python",
+      "args": ["-m", "server"],
+      "env": {
+        "PYTHONPATH": "/Users/YOUR_USERNAME/workspace/photographi"
+      }
     }
   }
 }
 ```
 
-### 🔒 Privacy Config (Optional)
-Telemetry is enabled by default to help us improve the tool. To **disable all usage tracking**, simply add the `--disable-telemetry` flag (see the [Privacy & Telemetry](#-privacy--telemetry) section for details):
+Restart Claude Desktop after saving the configuration.
+
+📖 **Detailed Guide**: See [docs/CLAUDE_DESKTOP_SETUP.md](docs/CLAUDE_DESKTOP_SETUP.md)
+
+---
+
+### Option B: GitHub Copilot CLI Integration
+
+**Configuration File**: `~/.config/github-copilot/config.json`
 
 ```json
 {
-  "mcpServers": {
+  "mcp_servers": {
     "photographi": {
-      "command": "photographi", // or "python3" if using source
+      "command": "photographi",
+      "args": []
+    }
+  }
+}
+```
+
+**For Development (Source Installation)**:
+```json
+{
+  "mcp_servers": {
+    "photographi": {
+      "command": "/Users/YOUR_USERNAME/workspace/photographi/venv/bin/python",
+      "args": ["-m", "server"],
+      "env": {
+        "PYTHONPATH": "/Users/YOUR_USERNAME/workspace/photographi"
+      }
+    }
+  }
+}
+```
+
+Restart your terminal session to activate the MCP server.
+
+**Quick Test**:
+```bash
+gh copilot explain "Use photographi to analyze this image: /path/to/photo.jpg"
+```
+
+---
+
+### 🔒 Privacy Config (Optional)
+Telemetry is enabled by default to help us improve the tool. To **disable all usage tracking**, add the `--disable-telemetry` flag:
+
+```json
+{
+  "mcpServers": {  // or "mcp_servers" for Copilot CLI
+    "photographi": {
+      "command": "photographi",
       "args": ["--disable-telemetry"]
     }
   }

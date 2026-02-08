@@ -1,0 +1,14 @@
+{
+    "mcpServers": {
+        "photographi": {
+            "command": "/Users/abhishekprasad/workspace/photographi/venv/bin/python",
+            "args": [
+                "-m",
+                "server"
+            ],
+            "env": {
+                "PYTHONPATH": "/Users/abhishekprasad/workspace/photographi"
+            }
+        }
+    }
+}
