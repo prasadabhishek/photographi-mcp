@@ -89,31 +89,33 @@ def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subj
         logger.error(f"Error analyzing {image_path}: {e}")
         return {"error": str(e)}
 
-def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
+def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", limit: int = 10, offset: int = 0) -> list[dict]:
     """
-    Batch processing pipeline for directory-scale analysis.
-    
-    Implements a recursive search for all supported image formats. To maintain
-    responsive MCP communication, results are capped at 50, but full culling
-    functionality is available via the `cull_folder` tool.
-    
-    Design:
-    Uses `tqdm` for terminal progress tracking while running analysis in 
-    a single-threaded loop to prioritize local memory stability over raw speed.
+    Batch processing pipeline for directory-scale analysis with pagination.
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
     
-    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")]
+    # Sort for stability
+    image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
     if not image_files:
         return {"message": "No images found in the folder."}
     
+    # Apply pagination
+    total_images = len(image_files)
+    paginated_files = image_files[offset : offset + limit]
+
+    if not paginated_files:
+        return {
+            "message": "No more images in this range.",
+            "totalImages": total_images,
+            "nextOffset": None
+        }
+
     results = {}
     total_confidence = 0
-    # Process all but limit the returned JSON size to prevent 400 Invalid Request Body
-    max_return = 10 
     
-    for i, filename in enumerate(tqdm(image_files, desc="Analyzing folder")):
+    for filename in tqdm(paginated_files, desc=f"Analyzing {offset}-{offset+limit}"):
         image_path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(image_path)[1]
         start_time = time.time()
@@ -140,58 +142,62 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
             if enable_subject_detection:
                 analytics.track_feature_usage("subject_detection")
             
-            # Only add to detailed results if within limit
-            if i < max_return:
-                results[filename] = {
-                    "judgement": result["judgement"],
-                    "score": round(result["overallConfidence"], 3),
-                    "summary": result.get("reasoning", {}).get("technical", "Good.")
-                }
+            results[filename] = {
+                "judgement": result["judgement"],
+                "score": round(result["overallConfidence"], 3),
+                "summary": result.get("reasoning", {}).get("technical", "Good.")
+            }
         except Exception as e:
             analytics.track_error()
-            if i < max_return:
-                results[filename] = {"error": str(e)}
+            results[filename] = {"error": str(e)}
         gc.collect()
             
-    avg_conf = round(total_confidence / len(image_files), 3) if image_files else 0
+    avg_conf = round(total_confidence / len(paginated_files), 3) if paginated_files else 0
     
     response = {
         "status": "Analysis Complete",
-        "totalImagesScanned": len(image_files),
+        "totalImagesInFolder": total_images,
+        "scanned": len(results),
+        "offset": offset,
+        "limit": limit,
         "averageConfidence": avg_conf,
-        "sampleResults": results
+        "results": results
     }
     
+    if offset + limit < total_images:
+        response["nextOffset"] = offset + limit
+        response["note"] = f"Processed items {offset} to {offset + len(results)}. Use offset={offset+limit} to continue."
+        
     # Trigger remote transmission attempt
     analytics.transmit_telemetry()
-    
-    if len(image_files) > max_return:
-        response["note"] = f"Showing first {max_return} of {len(image_files)} images. Request a ranking or specific file analysis for more."
-        
     return response
 
-def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
+def _rank_folder_logic(folder_path: str, top_n: int = 10, limit: int = 50, offset: int = 0, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
     """
     Burst-selection Intelligence: Finding the sharpest needle in the haystack.
-    
-    Science:
-    Sorts files by the `overallConfidence` score, which is a weighted sum 
-    of technical execution (Exposure, Sharpness, Noise) and aesthetic 
-    composition.
-    
-    Workflow:
-    Ideal for photographers who shoot in 'Burst Mode' and need the single 
-    best-executed frame from a high-speed sequence.
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": f"Directory not found: {folder_path}"}
     
-    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")]
+    # Sort for consistent pagination
+    image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
     if not image_files:
         return {"message": "No images found."}
+
+    # Apply pagination
+    total_images = len(image_files)
+    paginated_files = image_files[offset : offset + limit]
+    
+    if not paginated_files:
+        return {
+            "message": "No more images in this range.",
+            "totalImages": total_images,
+            "nextOffset": None
+        }
         
     scored_images = []
-    for filename in image_files:
+    # Only process the pagination window
+    for filename in tqdm(paginated_files, desc=f"Ranking {offset}-{offset+limit}"):
         path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(path)[1]
         start_time = time.time()
@@ -242,11 +248,21 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, metrics: list[str] = N
     scored_images.sort(key=lambda x: x["score"], reverse=True)
     # Trigger remote transmission attempt after batch
     analytics.transmit_telemetry()
-    return {
+    
+    response = {
         "status": "Ranking Complete", 
-        "totalImagesScanned": len(image_files), 
+        "totalImagesInFolder": total_images,
+        "scanned": len(scored_images),
+        "offset": offset,
+        "limit": limit,
         "bestImages": scored_images[:top_n]
     }
+    
+    if offset + limit < total_images:
+        response["nextOffset"] = offset + limit
+        response["note"] = f"Processed items {offset} to {offset + len(scored_images)}. Use offset={offset+limit} to continue."
+        
+    return response
 
 def _threshold_cull_logic(folder_path: str, min_confidence: float = 0.6, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
     """
@@ -463,19 +479,23 @@ def photographi_analyze_folder(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     metrics: Annotated[list[str], Field(description="Metrics to calculate.")] = None,
     enable_subject_detection: bool = True,
-    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano"
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
+    limit: Annotated[int, Field(description="Max images to process.")] = 10,
+    offset: Annotated[int, Field(description="Pagination offset.")] = 0
 ) -> dict:
     """
-    Batch analyzes an entire folder. 
-    Returns a technical sample of results. Use for quick library auditing.
+    Batch analyzes a folder with pagination.
+    Returns technical quality reports for the batch.
     """
     analytics.track_tool_invocation("photographi_analyze_folder")
-    return _analyze_folder_logic(folder_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+    return _analyze_folder_logic(folder_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size, limit=limit, offset=offset)
 
 @mcp.tool()
 def photographi_rank_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     top_n: Annotated[int, Field(description="Number of top-rated images to return.")] = 1,
+    limit: Annotated[int, Field(description="Max images to process to avoid timeout (default 50).")] = 50,
+    offset: Annotated[int, Field(description="Pagination offset.")] = 0,
     metrics: list[str] = None,
     enable_subject_detection: bool = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano"
@@ -485,7 +505,7 @@ def photographi_rank_photographs(
     Use this to find the single sharpest, best-exposed frame in a high-speed sequence.
     """
     analytics.track_tool_invocation("photographi_rank_photographs")
-    return _rank_folder_logic(folder_path, top_n=top_n, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+    return _rank_folder_logic(folder_path, top_n=top_n, limit=limit, offset=offset, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
 
 @mcp.tool()
 def photographi_cull_photographs(
