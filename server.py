@@ -6,7 +6,7 @@ import shutil
 import argparse
 import time
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 import logging
 import sys
 import gc
@@ -14,7 +14,6 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 from fastmcp import FastMCP
-from tqdm import tqdm
 from photo_quality_analyzer_core.analyzer import (
     evaluate_photo_quality,
     detect_objects,
@@ -141,7 +140,7 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
     results = {}
     total_confidence = 0
     
-    for filename in tqdm(paginated_files, desc=f"Analyzing {offset}-{offset+limit}"):
+    for filename in paginated_files:
         image_path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(image_path)[1]
         start_time = time.time()
@@ -225,7 +224,7 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, limit: int = 50, offse
         
     scored_images = []
     # Only process the pagination window
-    for filename in tqdm(paginated_files, desc=f"Ranking {offset}-{offset+limit}"):
+    for filename in paginated_files:
         path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(path)[1]
         start_time = time.time()
@@ -321,7 +320,7 @@ def _threshold_cull_logic(folder_path: str, min_confidence: float = 0.6, mode: s
     selects = []
     rejects = []
     
-    for filename in tqdm(image_files, desc="Threshold culling"):
+    for filename in image_files:
         path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(path)[1]
         start_time = time.time()
@@ -415,7 +414,7 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
         return {"message": "No images found."}
         
     scored_images = []
-    for filename in tqdm(image_files, desc="Visual intelligence analysis"):
+    for filename in image_files:
         path = os.path.join(folder_path, filename)
         format_ext = os.path.splitext(path)[1]
         start_time = time.time()
@@ -619,7 +618,7 @@ def _bulk_palette_logic(folder_path: str, colors: int = 5, limit: int = 20, offs
         
     results = {}
     
-    for filename in tqdm(paginated_files, desc="Extracting palettes"):
+    for filename in paginated_files:
         image_path = os.path.join(folder_path, filename)
         try:
             palette = generate_color_palette(image_path, colors)

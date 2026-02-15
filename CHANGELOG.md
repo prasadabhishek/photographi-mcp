@@ -5,13 +5,13 @@ All notable changes to the `photographi-mcp` project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.2] - 2026-02-15
+## [0.1.3] - 2026-02-15
 
 ### Fixed
-- Explicitly forced logging to `sys.stderr` to prevent protocol corruption on `stdout`.
-- Simplified `uvx` installation instructions to include the `--quiet` flag.
+- Removed `tqdm` dependency and all progress bars from the MCP server. This eliminates `stdout` noise permanently and reduces package bloat.
+- Verified that all non-protocol output is strictly isolated from `stdout` by forcing logging to `sys.stderr`.
 
-## [0.1.1] - 2026-02-15
+## [0.1.2] - 2026-02-15
 
 ### Added
 - Initial release of the `photographi` MCP server.

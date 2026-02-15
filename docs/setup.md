@@ -22,7 +22,7 @@ The fastest way to run `photographi` is via **Claude CLI** (Claude Code) or **uv
 ### Claude CLI (Claude Code)
 Install and configure automatically with a single command:
 ```bash
-claude mcp add photographi uvx --quiet photographi-mcp
+claude mcp add photographi uvx photographi-mcp
 ```
 
 ### GitHub Copilot CLI
@@ -33,7 +33,7 @@ Add this to your `~/.config/github-copilot/config.json`:
   "mcp_servers": {
     "photographi": {
       "command": "uvx",
-      "args": ["--quiet", "photographi-mcp"]
+      "args": ["photographi-mcp"]
     }
   }
 }
@@ -48,7 +48,7 @@ Add this to your `claude_desktop_config.json`:
   "mcpServers": {
     "photographi": {
       "command": "uvx",
-      "args": ["--quiet", "photographi-mcp"]
+      "args": ["photographi-mcp"]
     }
   }
 }
