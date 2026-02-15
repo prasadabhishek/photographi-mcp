@@ -48,4 +48,6 @@ culled_photos/
 *.xmp
 *.log
 
+# Internal Ops & Docs
+ops/
 # Internal Docs

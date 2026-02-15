@@ -4,7 +4,7 @@
 # Links scripts in ops/ to .git/hooks/
 
 HOOK_DIR=".git/hooks"
-PRE_PUSH_SRC="ops/pre-push.sh"
+PRE_PUSH_SRC="scripts/pre-push.sh"
 PRE_PUSH_DEST="$HOOK_DIR/pre-push"
 
 if [ ! -d ".git" ]; then
