@@ -248,13 +248,12 @@ def _cull_logic(folder_path: str, threshold: float = 0.4, mode: str = "move", is
     if not paginated_files: return {"message": "No more images.", "totalImages": total_images}
 
     # Setup directories
-    target_subdir = "selects" if is_threshold_mode else "kept_photos"
+    # Logic Change: We ONLY create the reject folder. We do NOT move "kept" photos.
+    # They stay in the root folder, which is the expected workflow for culling.
     reject_subdir = "rejects" if is_threshold_mode else "culled_photos"
-    target_dir = os.path.join(folder_path, target_subdir)
     reject_dir = os.path.join(folder_path, reject_subdir)
     
     if mode in ["move", "both"]:
-        os.makedirs(target_dir, exist_ok=True)
         os.makedirs(reject_dir, exist_ok=True)
 
     raw_results = _batch_executor(folder_path, paginated_files, metrics, enable_subject_detection, model_size, fast_mode)
@@ -269,7 +268,6 @@ def _cull_logic(folder_path: str, threshold: float = 0.4, mode: str = "move", is
         score = res["overallConfidence"]
         
         is_select = score >= threshold
-        dest_dir = target_dir if is_select else reject_dir
         actions = []
 
         if mode in ["xmp", "both"]:
@@ -278,15 +276,19 @@ def _cull_logic(folder_path: str, threshold: float = 0.4, mode: str = "move", is
             actions.append("XMP-Tagged")
             
         if mode in ["move", "both"]:
-            try:
-                shutil.move(path, os.path.join(dest_dir, filename))
-                xmp_path = os.path.splitext(path)[0] + ".xmp"
-                if os.path.exists(xmp_path):
-                    shutil.move(xmp_path, os.path.join(dest_dir, os.path.basename(xmp_path)))
-                actions.append("Moved")
-            except Exception as e:
-                logger.error(f"Move failed for {filename}: {e}")
-                actions.append("Move-Failed")
+            if not is_select:
+                # ONLY MOVE REJECTS
+                try:
+                    shutil.move(path, os.path.join(reject_dir, filename))
+                    xmp_path = os.path.splitext(path)[0] + ".xmp"
+                    if os.path.exists(xmp_path):
+                        shutil.move(xmp_path, os.path.join(reject_dir, os.path.basename(xmp_path)))
+                    actions.append("Moved-to-Rejects")
+                except Exception as e:
+                    logger.error(f"Move failed for {filename}: {e}")
+                    actions.append("Move-Failed")
+            else:
+                actions.append("Kept-In-Place")
         
         item = {"filename": filename, "score": round(score, 3), "actions": actions}
         if is_select: kept_items.append(item)
@@ -315,7 +317,7 @@ def photographi_analyze_photo(
     metrics: Annotated[list[str], Field(description="Specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition).")] = None,
     enable_subject_detection: bool = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
-    fast_mode: Annotated[bool, Field(description="Set to True for faster analysis by downsampling high-res images.")] = False
+    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
 ) -> dict:
     """Performs Studio-Grade technical analysis on a single photo."""
     analytics.track_tool_invocation("photographi_analyze_photo")
@@ -327,7 +329,7 @@ def photographi_analyze_folder(
     metrics: Annotated[list[str], Field(description="Specific metrics to calculate (sharpness, exposure, etc.). Defaults to all.")] = None,
     enable_subject_detection: Annotated[bool, Field(description="Use AI for subject-aware analysis.")] = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
-    limit: Annotated[int, Field(description="Batch size for pagination.")] = 10,
+    limit: Annotated[int, Field(description="Batch size for pagination.")] = 100,
     offset: Annotated[int, Field(description="Pagination offset. Increment this by 'limit' to see more results.")] = 0,
     fast_mode: Annotated[bool, Field(description="Enabled by default. Set to False for 'Forensic Precision' (full-res analysis, much slower on 40MP+).")] = True
 ) -> dict:
@@ -343,7 +345,7 @@ def photographi_analyze_folder(
 def photographi_rank_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     top_n: Annotated[int, Field(description="Number of top-rated images to return.")] = 1,
-    limit: Annotated[int, Field(description="Max images to evaluate in this batch.")] = 50,
+    limit: Annotated[int, Field(description="Max images to evaluate in this batch.")] = 100,
     offset: Annotated[int, Field(description="Pagination offset.")] = 0,
     metrics: Annotated[list[str], Field(description="Specific metrics for ranking.")] = None,
     enable_subject_detection: bool = True,
@@ -364,9 +366,9 @@ def photographi_cull_photographs(
     threshold: Annotated[float, Field(description="Overall score threshold (0.0-1.0). Images below this are culled.")] = 0.4,
     mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull action (move files or tag XMP).")] = "move",
     enable_subject_detection: bool = True,
-    limit: Annotated[int, Field(description="Number of images to cull in this batch.")] = 50,
+    limit: Annotated[int, Field(description="Number of images to cull in this batch.")] = 100,
     offset: Annotated[int, Field(description="Pagination offset.")] = 0,
-    fast_mode: Annotated[bool, Field(description="Enabled by default. Fast Mode is recommended for initial sorting.")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
 ) -> dict:
     """
     Filters low-quality images using concurrency.
@@ -382,9 +384,9 @@ def photographi_threshold_cull(
     min_confidence: float = 0.6,
     mode: Literal["move", "xmp", "both"] = "move",
     enable_subject_detection: bool = True,
-    limit: int = 50,
+    limit: int = 100,
     offset: int = 0,
-    fast_mode: bool = True
+    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
 ) -> dict:
     """Binary threshold culling using concurrency and pagination."""
     analytics.track_tool_invocation("photographi_threshold_cull")

@@ -5,6 +5,12 @@ All notable changes to the `photographi-mcp` project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-15
+### Changed
+- **Culling Logic**: `photographi_cull_photographs` now keeps "Selects" in their original folder and ONLY moves "Rejects" to a `culled_photos/` subfolder. This is a non-breaking workflow improvement.
+- **Defaults**: Increased default `limit` from 50 to 100 for all batch tools to reduce pagination friction.
+- **Docs**: Clarified `fast_mode=True` default in all tool descriptions.
+
 ## [0.2.1] - 2026-02-15
 
 ### Fixed
