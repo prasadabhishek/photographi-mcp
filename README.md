@@ -33,7 +33,7 @@ The fastest way to use `photographi` is via **Claude CLI** (Claude Code) or **uv
 Run this single command to automatically configure the server:
 
 ```bash
-claude mcp add photographi uvx photographi-mcp
+claude mcp add --scope user photographi uvx photographi-mcp
 ```
 
 ### 2. GitHub Copilot CLI
@@ -123,18 +123,22 @@ Telemetry is enabled by default to help us improve the tool. To **disable all us
 
 ### 2. `photographi_analyze_folder`
 **What it does**: Scans an entire folder and provides a statistical quality report (with pagination).
+- **Features**: High concurrency (4-8x), Pagination (`limit`, `offset`), and **Fast Mode** (enabled by default).
 - **LLM Use Case**: *"I just finished a shoot; scan the 'Portraits' folder and tell me the overall success rate of the focus."*
 
 ### 3. `photographi_rank_photographs`
 **What it does**: Identifies the "winners" in a group of photos based on technical perfection.
+- **Features**: Uses Fast Mode to quickly rank bursts of 40MP+ images.
 - **LLM Use Case**: *"I took 10 shots of this bird taking flight. Find the single frame that is the sharpest and best exposed."*
 
 ### 4. `photographi_cull_photographs`
 **What it does**: Intelligently filters out low-quality "junk" (blurry, dark, or duplicates) into a separate `culled_photos` folder.
+- **Features**: Supports moving files or just tagging them via XMP.
 - **LLM Use Case**: *"Clean up my 'Downloads' folder by moving all the low-quality or blurry screenshots to a culled folder."*
 
 ### 5. `photographi_threshold_cull`
 **What it does**: A strict "Keep or Toss" tool that sorts photos based on a specific quality score into `selects/` or `rejects/`.
+- **Features**: Highly concurrent. Perfect for strict ingestion workflows.
 - **LLM Use Case**: *"Be strict: sort this folder. Anything with a quality score below 0.7 goes into 'rejects', the rest go into 'selects'."*
 
 ### 6. `photographi_get_color_palette`
@@ -197,10 +201,11 @@ To disable all telemetry (both local logging and remote transmission), you can e
 
 | Capability | Speed (M1/M2/M3) | Description |
 | :--- | :--- | :--- |
-| **Model Load** | **~0.50s** | One-time initialization of YOLO26n ONNX model |
-| **Technical Scan** | **~0.44s** / img | Full Signal Processing + AI Subject Detection (Nano) |
-| **Throughput** | **~28,000** img/hr | Validated batch processing speed for massive culls |
-| **Scalability** | **Unlimited** | Verified pagination stability for 10,000+ folders |
+| **Model Load** | **~0.38s** | One-time initialization of YOLO26n ONNX model |
+| **Technical Scan** | **~0.19s** / img | **Fast Mode** (Downsampled 40MP -> 1024px) + Concurrency |
+| **Forensic Scan** | **~1.50s** / img | Full-Resolution Analysis (Opt-in via `fast_mode=False`) |
+| **Throughput** | **~18,000** img/hr | Effective batch rate for mixed workloads |
+| **Scalability** | **Unlimited** | Verified pagination support for 10,000+ folders |
 
 *Tested on local Apple Silicon hardware with 1024x1024 synthetic assets. High-resolution RAW files may vary based on disk I/O.*
 
