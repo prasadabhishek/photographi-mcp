@@ -5,6 +5,18 @@ All notable changes to the `photographi-mcp` project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-02-15
+
+### ⚡ Performance & Scalability
+- **Concurrency**: Implemented `ThreadPoolExecutor` for all batch operations (`analyze_folder`, `cull_photographs`, `rank_photographs`), enabling parallel processing of 4-8 images.
+- **Pagination**: Added `limit` and `offset` parameters to all batch tools, supporting large dataset processing without timeouts.
+- **Fast Mode**: All batch tools now default to `fast_mode=True` (downsampled analysis) for rapid triage.
+- **Thread Safety**: Fixed race conditions in `AnalyticsManager` to support concurrent telemetry.
+
+### 🛠️ Fixes
+- **Renaming**: Standardized internal logic functions (`_cull_logic` vs `_threshold_cull_logic`).
+- **Stability**: Improved error handling in batch executors.
+
 ## [0.1.3] - 2026-02-15
 
 ### Fixed
