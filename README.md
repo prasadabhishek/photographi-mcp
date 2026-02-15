@@ -1,14 +1,31 @@
 # photographi-mcp
+**Fast, private, and grounded technical photo analysis for AI applications.**
 
-**Give your AI the ability to see, analyze, and manage your local photo library.**
+`photographi-mcp` is an MCP server that enables AI models and LLM-powered tools to perform technical analysis on local photo libraries. It runs computer vision models directly on your hardware to evaluate sharpness, focus, and exposure—enabling capabilities like automated culling, burst ranking, and metadata indexing without requiring a cloud upload.
 
-`photographi-mcp` is an MCP server that allows LLMs (like Claude) to work with your photos locally. It analyzes things like focus, lighting, and quality automatically—all while keeping your data **100% private**.
+### ⚡ Why photographi?
+- **Technical First**: Purpose-built for objective metrics (sharpness, lighting, focus). It provides technical data for evaluating image quality.
+- **Token Efficient**: Save model context by pre-filtering technical metadata locally. Only the most relevant insights are sent to the AI application, keeping sessions fast and lean.
+- **Privacy First**: All analysis happens 100% locally on your machine.
+- **Low Latency**: Built for efficient processing, allowing for rapid ranking and technical feedback on local photo folders.
+---
 
-Whether you need to find the best shot in a burst, cull a massive shoot, or search your library semantically, `photographi-mcp` gives your AI agent the "visual brain" it needs to get the job done.
+## 👁️ What It Analyzes
+
+- **Smart Focus**: Detects subjects and verifies they're sharp
+- **Exposure**: Catches blown highlights and blocked shadows  
+- **Gear-Aware**: Knows your lens's sweet spot for optimal sharpness
+- **Composition**: Evaluates framing and subject placement
+- **Quality Alerts**: Flags motion blur, diffraction, high ISO noise
+
+> [!NOTE]
+> **Technical vs. Artistic**: This tool is strictly **objective**. It evaluates photos based on technical metrics and computer vision (sharpness, exposure, noise, etc.). It does **not** understand artistic intent, aesthetics, or "vibe." A blurry, underexposed photo may be an artistic masterpiece, but `photographi` will correctly flag it as technically poor.
+
+For the science and math behind it, see the **[Technical Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md)**.
 
 ---
 
-## � See It In Action
+## 📸 See It In Action
 
 Here are real examples from actual photo analysis:
 
@@ -31,52 +48,40 @@ Here are real examples from actual photo analysis:
 ---
 
 ### Example 2: Poor Photo  
-![Worst Shot](/Users/abhishekprasad/.gemini/antigravity/brain/e29205bc-6f97-4407-9406-bedc84bab710/burst_worst.jpg)
+![Worst Shot](docs/examples/bad_example.jpg)
 
 ```json
 {
-  "overallConfidence": 0.31,
-  "judgement": "Poor",
+  "overallConfidence": 0.20,
+  "judgement": "Very Poor",
   "keyMetrics": {
-    "sharpness": 0.28,
-    "exposure": 0.41
+    "sharpness": 0.30,
+    "focus": 0.07,
+    "exposure": 0.0
   }
 }
 ```
-**Verdict:** Motion blur, underexposed, not usable for prints.
+**Verdict:** Missed focus on subject, severe underexposure/black clipping, and excessive headroom.
 
 ---
 
-### Example 3: Technical Breakdown
-![Technical Analysis](/Users/abhishekprasad/.gemini/antigravity/brain/e29205bc-6f97-4407-9406-bedc84bab710/technical_example.jpg)
+## 🛠️ Tools (MCP)
 
-```json
-{
-  "metrics": {
-    "sharpness": { "score": 0.78, "verdict": "Acceptably Sharp" },
-    "exposure": { "score": 0.82, "verdict": "Well Exposed" },
-    "noise": { "score": 0.71, "verdict": "Low Noise" },
-    "focus": { "score": 0.80, "verdict": "Good Focus" }
-  }
-}
-```
-**Analysis:** Good overall quality, suitable for web use and medium prints.
+`photographi-mcp` exposes several tools for your AI:
+- **`photographi_analyze_photo`**: Deep technical audit of a single image.
+- **`photographi_analyze_folder`**: Statistical quality report for a folder.
+- **`photographi_rank_photographs`**: Ranks photos by technical perfection (ideal for bursts).
+- **`photographi_cull_photographs`**: Moves low-quality photos to a `culled_photos` folder.
+- **`photographi_threshold_cull`**: Strict "Keep/Toss" sorting based on score.
+- **`photographi_get_color_palette`**: Extracts dominant color palettes from an image.
+- **`photographi_get_folder_palettes`**: Batch color extraction for an entire folder.
+- **`photographi_get_scene_content`**: Identifies key objects (people, animals, etc.).
 
----
-
-## 👁️ What It Analyzes
-
-- **Smart Focus**: Detects subjects and verifies they're sharp
-- **Exposure**: Catches blown highlights and blocked shadows  
-- **Gear-Aware**: Knows your lens's sweet spot for optimal sharpness
-- **Composition**: Evaluates framing and subject placement
-- **Quality Alerts**: Flags motion blur, diffraction, high ISO noise
-
-For the science and math behind it, see the **[Technical Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md)**.
+**[Full API Reference](docs/api-reference.md)**
 
 ---
 
-## ⚡ Get Started in 30 Seconds
+## 🚀 Get Started
 
 ### Claude CLI (Fastest)
 ```bash
@@ -109,28 +114,23 @@ Add to `~/.config/github-copilot/config.json`:
 }
 ```
 
-**📖 Full Setup Guide**: [docs/setup.md](docs/setup.md)
+---
+
+## 🔒 Privacy & Telemetry
+
+`photographi` is built on a **Privacy-First** philosophy.
+- **Anonymized Aggregates Only**: We never collect filenames, paths, or EXIF data.
+- **Total Transparency**: Audit our collection logic directly in `analytics.py`.
+- **Opt-Out**: Set the environment variable `PHOTOGRAPHI_TELEMETRY_DISABLED=1` or use the `--disable-telemetry` flag.
 
 ---
 
-## � What's Next?
+## 📖 Documentation
 
-1. **Try it out**: Ask Claude to analyze a photo or cull a folder
-2. **Learn the tools**: See all 8 available tools in [docs/setup.md](docs/setup.md#tools)
-3. **Upgrade**: Run `uvx --refresh photographi-mcp` for latest features
-4. **Advanced setup**: Check [docs/setup.md](docs/setup.md) for local dev, privacy config, and troubleshooting
-
-**Privacy**: Telemetry enabled by default (anonymous aggregates only). [Opt-out instructions](docs/setup.md#privacy).
-
----
-
-##🗺️ Community
-
-**License**: MIT  
-**Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md)  
-**Issues**: [GitHub Issues](https://github.com/prasadabhishek/photographi-mcp/issues)
-
-Built with science. See [Technical Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md).
+- **[Setup & Config Guide](docs/setup.md)**: Detailed configuration and troubleshooting.
+- **[The Science](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md)**: Math and theory behind the quality scoring.
+- **[Contributing](CONTRIBUTING.md)**: How to help improve the project.
+- **[GitHub Issues](https://github.com/prasadabhishek/photographi-mcp/issues)**: Report bugs or request features.
 
 ---
 
@@ -140,5 +140,5 @@ Built with science. See [Technical Documentation](https://github.com/prasadabhis
     <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Compatible-green.svg" alt="MCP Protocol"></a>
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
   </p>
-  <p>Built with ❤️ for the Creative Community</p>
+  <p>Built with ❤️ for photographers</p>
 </div>
