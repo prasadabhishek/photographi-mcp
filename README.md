@@ -89,6 +89,28 @@ uvx photographi-mcp --help
 
 ---
 
+## 🔄 Upgrading to the Latest Version
+
+To upgrade to the latest version of `photographi-mcp`, run:
+
+```bash
+uvx --refresh photographi-mcp
+```
+
+This command forces `uvx` to fetch and install the newest version from PyPI.
+
+**When to upgrade:**
+- After a new release is announced
+- If you're experiencing issues that might be fixed in a newer version
+- To get the latest features and improvements
+
+**Check your current version:**
+```bash
+uvx photographi-mcp --version
+```
+
+---
+
 ## 🗺️ Roadmap & Community
 We are building the future of privacy-first visual AI. See **[CONTRIBUTING.md](CONTRIBUTING.md)** to get involved.
 
