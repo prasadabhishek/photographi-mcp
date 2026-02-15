@@ -14,21 +14,12 @@ This guide covers the installation, configuration, and troubleshooting of the **
 
 ## 📥 Zero-Install Setup (Recommended)
 
-The easiest way to run `photographi` is using `uvx`. This requires no manual installation or virtual environment management.
+The fastest way to run `photographi` is via **Claude CLI** (Claude Code) or **uvx**. These methods require no manual virtual environment management.
 
-### Claude Desktop
-Add this to your `claude_desktop_config.json`:
-**Path**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "photographi": {
-      "command": "uvx",
-      "args": ["photographi-mcp"]
-    }
-  }
-}
+### Claude CLI (Claude Code)
+Install and configure automatically with a single command:
+```bash
+claude mcp add photographi uvx photographi-mcp
 ```
 
 ### GitHub Copilot CLI
@@ -37,6 +28,21 @@ Add this to your `~/.config/github-copilot/config.json`:
 ```json
 {
   "mcp_servers": {
+    "photographi": {
+      "command": "uvx",
+      "args": ["photographi-mcp"]
+    }
+  }
+}
+```
+
+### Claude Desktop
+Add this to your `claude_desktop_config.json`:
+**Path**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
     "photographi": {
       "command": "uvx",
       "args": ["photographi-mcp"]

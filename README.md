@@ -24,14 +24,21 @@ For the math and signal processing details, see the **[Technical Science Documen
 
 ## ⚡ Quick Start: Zero-Install
 
-The easiest way to use `photographi` is via `uvx`. No manual installation required.
+The fastest way to use `photographi` is via **Claude CLI** (Claude Code) or **uvx**. No manual installation required.
 
-### 1. Claude Desktop (macOS)
-Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+### 1. Claude CLI (Claude Code)
+Run this single command to automatically configure the server:
+
+```bash
+claude mcp add photographi uvx photographi-mcp
+```
+
+### 2. GitHub Copilot CLI
+Add the following to your `~/.config/github-copilot/config.json`:
 
 ```json
 {
-  "mcpServers": {
+  "mcp_servers": {
     "photographi": {
       "command": "uvx",
       "args": ["photographi-mcp"]
@@ -40,12 +47,12 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### 2. GitHub Copilot CLI
-Add this to `~/.config/github-copilot/config.json`:
+### 3. Claude Desktop (macOS)
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
-  "mcp_servers": {
+  "mcpServers": {
     "photographi": {
       "command": "uvx",
       "args": ["photographi-mcp"]
