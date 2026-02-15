@@ -25,8 +25,8 @@ class AnalyticsManager:
         self.official_relay = "https://photographi-telemetry.abhishek-a-prasad.workers.dev/"
         
         # Configuration
-        self.disabled = os.environ.get("PHOTOGRAPH_TELEMETRY_DISABLED", "0") == "1"
-        self.endpoint = os.environ.get("PHOTOGRAPH_TELEMETRY_ENDPOINT", self.official_relay)
+        self.disabled = os.environ.get("PHOTOGRAPHI_TELEMETRY_DISABLED", "0") == "1"
+        self.endpoint = os.environ.get("PHOTOGRAPHI_TELEMETRY_ENDPOINT", self.official_relay)
 
     def configure(self, endpoint: str = None, disabled: bool = None):
         """
