@@ -1,54 +1,48 @@
-# 🔌 Setup & Integration Guide
+# photographi-mcp Setup & Configuration
 
-This guide covers the installation, configuration, and troubleshooting of the **photographi** MCP server.
+This guide covers advanced configuration, local development, and troubleshooting for `photographi-mcp`.
 
----
+## 🔄 Upgrading
 
-## 🛠️ Prerequisites
+To upgrade to the latest version of `photographi-mcp`, run:
 
-1.  **Claude Desktop** installed on macOS (or your preferred MCP-compatible client).
-2.  **Python 3.10+** installed on your system.
-3.  **photographi** source code or package access.
-
----
-
-## 📥 Zero-Install Setup (Recommended)
-
-The fastest way to run `photographi` is via **Claude CLI** (Claude Code) or **uvx**.
-
-> [!IMPORTANT]
-> These methods require **[uv](https://docs.astral.sh/uv/getting-started/installation/)** to be installed on your system.
-
-### Claude CLI (Claude Code)
-Install and configure automatically with a single command:
 ```bash
-claude mcp add photographi uvx photographi-mcp
+uvx --refresh photographi-mcp
 ```
 
-### GitHub Copilot CLI
-Add this to your `~/.config/github-copilot/config.json`:
+This command forces `uvx` to fetch and install the newest version from PyPI.
 
-```json
-{
-  "mcp_servers": {
-    "photographi": {
-      "command": "uvx",
-      "args": ["photographi-mcp"]
-    }
-  }
-}
+**When to upgrade:**
+- After a new release is announced
+- If you're experiencing issues that might be fixed in a newer version
+- To get the latest features and improvements
+
+**Check your current version:**
+```bash
+uvx photographi-mcp --version
 ```
 
-### Claude Desktop
-Add this to your `claude_desktop_config.json`:
-**Path**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+---
+
+## 🔒 Privacy & Telemetry
+
+`photographi` is built on a **Privacy-First** philosophy. We collect high-level, anonymized usage metrics to help improve the tool, but we guarantee your personal data never leaves your machine.
+
+### Our Privacy Promise
+- **Anonymized Aggregates Only**: We **NEVER** collect file names, paths, EXIF metadata, or any identifiers. We only track total counts (e.g., "15 images processed") and quality distributions (e.g., "3 Excellent results").
+- **Zero Identification**: We do not use fingerprints, machine IDs, or cookies. Even we cannot tell which user is sending which metrics.
+- **Transparency**: You can audit exact collection logic in [`analytics.py`](../analytics.py).
+- **Full Control**: Telemetry is enabled by default to help us improve, but you can opt-out completely with a single flag.
+
+### How to Opt-Out
+To disable all telemetry (both local logging and remote transmission), you can either set the environment variable `PHOTOGRAPHI_TELEMETRY_DISABLED=1`, or add the `--disable-telemetry` flag to your `mcp_config.json`:
 
 ```json
 {
   "mcpServers": {
     "photographi": {
       "command": "uvx",
-      "args": ["photographi-mcp"]
+      "args": ["photographi-mcp", "--disable-telemetry"]
     }
   }
 }
@@ -56,67 +50,63 @@ Add this to your `claude_desktop_config.json`:
 
 ---
 
-## 🛠️ Advanced: Local Development Setup
+## 🛠️ Tools Reference
 
-If you are developing or want to use a local clone:
+`photographi-mcp` provides several tools for your AI agent.
 
-1. **Install in Editable Mode**:
+### 1. `photographi_analyze_photo`
+Performs a deep technical audit of a single image.
+- **Supports**: JPEG, PNG, RAW (.ARW, .CR2, .NEF, .DNG, .CR3, etc.), and TIFF.
+
+### 2. `photographi_analyze_folder`
+Scans an entire folder and provides a statistical quality report (with pagination).
+
+### 3. `photographi_rank_photographs`
+Identifies the "winners" in a group of photos based on technical perfection.
+
+### 4. `photographi_cull_photographs`
+Intelligently filters out low-quality "junk" (blurry, dark, or duplicates) into a separate `culled_photos` folder.
+> [!TIP]
+> **Selects stay in place**: New in v0.2.2—only rejected photos are moved.
+
+### 5. `photographi_threshold_cull`
+A strict "Keep or Toss" tool that sorts photos based on a specific quality score into `selects/` or `rejects/`.
+
+### 6. `photographi_get_color_palette` / `photographi_get_folder_palettes`
+Extracts dominant colors from images as Hex codes.
+
+### 7. `photographi_get_scene_content`
+Identifies key objects (people, animals, vehicles, etc.) for quick indexing.
+
+---
+
+## 🏗️ Local Development
+
+If you want to contribute or edit the source code:
+
+1. **Setup**:
    ```bash
+   git clone https://github.com/prasadabhishek/photographi.git
+   cd photographi
+   uv venv
+   source .venv/bin/activate
    pip install -e .
    ```
 
-2. **Manual Configuration**:
-   ```json
-   "photographi": {
-     "command": "photographi",
-     "args": []
-   }
-   ```
+2. **Configuration**:
+   Point your `command` to the local `photographi` executable or use the absolute path to your venv's python.
 
 ---
 
-## 🔄 Reloading & Verification
+## 📊 Performance Benchmark
 
-After saving the configuration, you must restart Claude Desktop to initialize the server.
-
-### Verifying Tools
-Type `/mcp` or "List available MCP tools" in Claude. You should see all 8 specialized tools:
-1.  ✅ `photographi_analyze_photo`
-2.  ✅ `photographi_analyze_folder`
-3.  ✅ `photographi_rank_photographs`
-4.  ✅ `photographi_cull_photographs`
-5.  ✅ `photographi_threshold_cull`
-6.  ✅ `photographi_get_color_palette`
-7.  ✅ `photographi_get_folder_palettes`
-8.  ✅ `photographi_get_scene_content`
+| Capability | Speed (M1/M2/M3) | Description |
+| :--- | :--- | :--- |
+| **Model Load** | **~0.38s** | One-time initialization of YOLO26n ONNX model |
+| **Technical Scan** | **~0.19s** / img | **Fast Mode** (Downsampled 40MP -> 1024px) + Concurrency |
+| **Forensic Scan** | **~1.50s** / img | Full-Resolution Analysis (Opt-in via `fast_mode=False`) |
 
 ---
 
-## 🆘 Troubleshooting
-
-### 1. Server Not Appearing
-- **Check Logs**: `tail -f ~/Library/Logs/Claude/mcp*.log`
-- **Verify Path**: Ensure the `command` path (if using absolute) is correct by running `which photographi` or checking your virtual environment.
-
-### 2. "File Not Found"
-The MCP server requires **absolute paths** to access your photos. 
-- ❌ `Photos/DSC100.jpg`
-- ✅ `/Users/Name/Pictures/DSC100.jpg`
-
-### 3. Import or Execution Errors
-If the server crashes on startup, verify the dependencies are correctly installed:
-```bash
-python -c "from photo_quality_analyzer_core.analyzer import evaluate_photo_quality; print('OK')"
-```
-
----
-
-## 🔒 Advanced options
-
-### Disable Telemetry
-Add the environment variable `PHOTOGRAPHI_TELEMETRY_DISABLED=1` to your config's `env` block:
-```json
-"env": {
-  "PHOTOGRAPHI_TELEMETRY_DISABLED": "1"
-}
-```
+## 🤝 Contributing
+Contributions are welcome! Please read `CONTRIBUTING.md` for details.
