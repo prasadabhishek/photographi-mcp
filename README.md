@@ -173,7 +173,7 @@ Telemetry is enabled by default to help us improve the tool. To **disable all us
 - **Full Control**: Telemetry is enabled by default to help us improve, but you can opt-out completely with a single flag.
 
 ### How to Opt-Out
-To disable all telemetry (both local logging and remote transmission), add the `--disable-telemetry` flag to your `mcp_config.json`:
+To disable all telemetry (both local logging and remote transmission), you can either set the environment variable `PHOTOGRAPHI_TELEMETRY_DISABLED=1`, or add the `--disable-telemetry` flag to your `mcp_config.json`:
 
 ```json
 {
