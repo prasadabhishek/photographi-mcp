@@ -23,14 +23,14 @@ jobs:
     - name: Run tests
       run: pytest tests/ -v
 
-  publish:
-    name: Build and Publish
+  release-and-publish:
+    name: Release & Publish
     needs: test
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write
-      contents: read
+      id-token: write      # Required for PyPI trusted publishing
+      contents: write      # Required for creating GitHub releases
       
     steps:
     - uses: actions/checkout@v4
@@ -39,6 +39,26 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    
+    # Extract version from tag (e.g., v0.1.0 -> 0.1.0)
+    - name: Extract version
+      id: version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+    
+    # Extract changelog section for this version
+    - name: Extract changelog
+      id: changelog
+      run: |
+        python scripts/extract_changelog.py ${{ steps.version.outputs.VERSION }} > release_notes.md
+        echo "Changelog extracted for v${{ steps.version.outputs.VERSION }}"
+    
+    # Create GitHub Release with changelog
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
         
     - name: Install build tools
       run: |
