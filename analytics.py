@@ -46,6 +46,8 @@ class AnalyticsManager:
              self._track_environment()
 
     def _ensure_file_exists(self):
+        # Create directory if it doesn't exist
+        self.home_dir.mkdir(parents=True, exist_ok=True)
         if not self.telemetry_path.exists():
             initial_data = {
                 "first_run": str(datetime.datetime.now()),
@@ -94,7 +96,11 @@ class AnalyticsManager:
                 return json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
             self._ensure_file_exists()
-            return self._load_data()
+            # If still fails (e.g. permission error), return initial_data structure to avoid infinite loop
+            if not self.telemetry_path.exists():
+                return {}
+            with open(self.telemetry_path, 'r') as f:
+                return json.load(f)
 
     def _save_data(self, data):
         if self.disabled: return
