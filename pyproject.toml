@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photographi-mcp"
-version = "0.2.2"
+version = "0.2.3"
 authors = [
   { name="Abhishek Prasad" },
 ]
@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "fastmcp>=0.1.0",
-    "photo-quality-analyzer-core>=0.8.1",
+    "photo-quality-analyzer-core>=0.8.2",
 ]
 
 [project.optional-dependencies]

@@ -26,6 +26,8 @@ from analytics import analytics
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("photographi-mcp")
 
+__version__ = "0.2.3"
+
 # Initialize MCP server
 mcp = FastMCP("photographi")
 

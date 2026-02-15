@@ -8,37 +8,96 @@ Whether you need to find the best shot in a burst, cull a massive shoot, or sear
 
 ---
 
-## 👁️ What It Sees
+## � See It In Action
 
-The engine analyzes every pixel to understand exactly what happened when you pressed the shutter:
+Here are real examples from actual photo analysis:
 
-*   **Smart Focus**: It finds the main subject of your photo and makes sure it's actually sharp.
-*   **Lighting Check**: It looks for photos that are too bright or too dark, and finds "hidden" details in the shadows.
-*   **Gear Awareness**: It understands your specific camera and lens to know what a "perfect" shot should look like for your equipment.
-*   **Composition**: It evaluates how the photo is organized and if there is enough space around the subject.
-*   **Quality Alerts**: It catches common issues, like when your settings are accidentally making your images look soft or fuzzy.
+### Example 1: Excellent Photo
+![Best Shot](docs/examples/burst_best.jpg)
 
-For the math and signal processing details, see the **[Technical Science Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md)**.
+```json
+{
+  "overallConfidence": 0.89,
+  "judgement": "Excellent",
+  "keyMetrics": {
+    "sharpness": 0.94,
+    "exposure": 0.87,
+    "composition": 0.85
+  }
+}
+```
+**Verdict:** Tack sharp on subject, well exposed, strong composition.
 
 ---
 
-## ⚡ Quick Start: Zero-Install
+### Example 2: Poor Photo  
+![Worst Shot](/Users/abhishekprasad/.gemini/antigravity/brain/e29205bc-6f97-4407-9406-bedc84bab710/burst_worst.jpg)
 
-The fastest way to use `photographi` is via **Claude CLI** (Claude Code) or **uvx**.
+```json
+{
+  "overallConfidence": 0.31,
+  "judgement": "Poor",
+  "keyMetrics": {
+    "sharpness": 0.28,
+    "exposure": 0.41
+  }
+}
+```
+**Verdict:** Motion blur, underexposed, not usable for prints.
 
-> [!NOTE]
-> These methods require **[uv](https://docs.astral.sh/uv/getting-started/installation/)** to be installed on your system.
+---
 
-### 1. Claude CLI (Claude Code)
-Run this single command to automatically configure the server:
+### Example 3: Technical Breakdown
+![Technical Analysis](/Users/abhishekprasad/.gemini/antigravity/brain/e29205bc-6f97-4407-9406-bedc84bab710/technical_example.jpg)
 
+```json
+{
+  "metrics": {
+    "sharpness": { "score": 0.78, "verdict": "Acceptably Sharp" },
+    "exposure": { "score": 0.82, "verdict": "Well Exposed" },
+    "noise": { "score": 0.71, "verdict": "Low Noise" },
+    "focus": { "score": 0.80, "verdict": "Good Focus" }
+  }
+}
+```
+**Analysis:** Good overall quality, suitable for web use and medium prints.
+
+---
+
+## 👁️ What It Analyzes
+
+- **Smart Focus**: Detects subjects and verifies they're sharp
+- **Exposure**: Catches blown highlights and blocked shadows  
+- **Gear-Aware**: Knows your lens's sweet spot for optimal sharpness
+- **Composition**: Evaluates framing and subject placement
+- **Quality Alerts**: Flags motion blur, diffraction, high ISO noise
+
+For the science and math behind it, see the **[Technical Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md)**.
+
+---
+
+## ⚡ Get Started in 30 Seconds
+
+### Claude CLI (Fastest)
 ```bash
 claude mcp add --scope user photographi uvx photographi-mcp
 ```
 
-### 2. GitHub Copilot CLI
-Add the following to your `~/.config/github-copilot/config.json`:
+### Claude Desktop (macOS)
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "photographi": {
+      "command": "uvx",
+      "args": ["photographi-mcp"]
+    }
+  }
+}
+```
 
+### GitHub Copilot CLI
+Add to `~/.config/github-copilot/config.json`:
 ```json
 {
   "mcp_servers": {
@@ -50,204 +109,28 @@ Add the following to your `~/.config/github-copilot/config.json`:
 }
 ```
 
-### 3. Claude Desktop (macOS)
-Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "photographi": {
-      "command": "uvx",
-      "args": ["photographi-mcp"]
-    }
-  }
-}
-```
+**📖 Full Setup Guide**: [docs/setup.md](docs/setup.md)
 
 ---
 
-## 🛠️ Advanced: Local Development
+## � What's Next?
 
-If you want to contribute or edit the source code:
+1. **Try it out**: Ask Claude to analyze a photo or cull a folder
+2. **Learn the tools**: See all 8 available tools in [docs/setup.md](docs/setup.md#tools)
+3. **Upgrade**: Run `uvx --refresh photographi-mcp` for latest features
+4. **Advanced setup**: Check [docs/setup.md](docs/setup.md) for local dev, privacy config, and troubleshooting
 
-1. **Setup**:
-   ```bash
-   git clone https://github.com/prasadabhishek/photographi.git
-   cd photographi
-   pip install -e .
-   ```
-
-2. **Configuration**:
-   Point your `command` to the local `photographi` executable or use the absolute path to your venv's python.
-
-📖 **Full Documentation**: See [docs/setup.md](docs/setup.md)
-
-**Quick Test**:
-```bash
-uvx photographi-mcp --help
-```
+**Privacy**: Telemetry enabled by default (anonymous aggregates only). [Opt-out instructions](docs/setup.md#privacy).
 
 ---
 
-## 🔄 Upgrading to the Latest Version
+##🗺️ Community
 
-To upgrade to the latest version of `photographi-mcp`, run:
+**License**: MIT  
+**Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md)  
+**Issues**: [GitHub Issues](https://github.com/prasadabhishek/photographi-mcp/issues)
 
-```bash
-uvx --refresh photographi-mcp
-```
-
-This command forces `uvx` to fetch and install the newest version from PyPI.
-
-**When to upgrade:**
-- After a new release is announced
-- If you're experiencing issues that might be fixed in a newer version
-- To get the latest features and improvements
-
-**Check your current version:**
-```bash
-uvx photographi-mcp --version
-```
-
----
-
-## 🗺️ Roadmap & Community
-We are building the future of privacy-first visual AI. See **[CONTRIBUTING.md](CONTRIBUTING.md)** to get involved.
-
-**License**: MIT
-
----
-
-### 🔒 Privacy Config (Optional)
-Telemetry is enabled by default to help us improve the tool. To **disable all usage tracking**, add the `--disable-telemetry` flag:
-
-```json
-{
-  "mcpServers": {  // or "mcp_servers" for Copilot CLI
-    "photographi": {
-      "command": "photographi",
-      "args": ["--disable-telemetry"]
-    }
-  }
-}
-```
-
----
-
-## 🛠️ Tools (MCP)
-
-`photographi-mcp` gives your AI agent (like Claude) a set of powerful tools to interact with your photos. Here is how to use them:
-
-### 1. `photographi_analyze_photo`
-**What it does**: Performs a deep technical audit of a single image.
-- **LLM Use Case**: *"Audit this RAW file and tell me if the focus is sharp enough for a large print."*
-- **Supports**: JPEG, PNG, RAW (.ARW, .CR2, .NEF, .DNG, .CR3, etc.), and TIFF.
-
-### 2. `photographi_analyze_folder`
-**What it does**: Scans an entire folder and provides a statistical quality report (with pagination).
-- **Features**: High concurrency (4-8x), Pagination (`limit`, `offset`), and **Fast Mode** (enabled by default).
-- **LLM Use Case**: *"I just finished a shoot; scan the 'Portraits' folder and tell me the overall success rate of the focus."*
-
-### 3. `photographi_rank_photographs`
-**What it does**: Identifies the "winners" in a group of photos based on technical perfection.
-- **Features**: Uses Fast Mode to quickly rank bursts of 40MP+ images.
-- **LLM Use Case**: *"I took 10 shots of this bird taking flight. Find the single frame that is the sharpest and best exposed."*
-
-### 4. `photographi_cull_photographs`
-**What it does**: Intelligently filters out low-quality "junk" (blurry, dark, or duplicates) into a separate `culled_photos` folder.
-- **Features**: Supports moving files or just tagging them via XMP.
-- **LLM Use Case**: *"Clean up my 'Downloads' folder by moving all the low-quality or blurry screenshots to a culled folder."*
-
-### 5. `photographi_threshold_cull`
-**What it does**: A strict "Keep or Toss" tool that sorts photos based on a specific quality score into `selects/` or `rejects/`.
-- **Features**: Highly concurrent. Perfect for strict ingestion workflows.
-- **LLM Use Case**: *"Be strict: sort this folder. Anything with a quality score below 0.7 goes into 'rejects', the rest go into 'selects'."*
-
-### 6. `photographi_get_color_palette`
-**What it does**: Extracts the dominant colors from a photo (as Hex codes).
-- **LLM Use Case**: *"Look at my best landscape shots and extract a color palette I can use to design my photography portfolio website."*
-
-### 7. `photographi_get_folder_palettes`
-**What it does**: Extracts dominant colors for every image in a folder (with pagination).
-- **LLM Use Case**: *"Analyze all photos in this folder and give me their color palettes so I can group them by mood."*
-
-### 8. `photographi_get_scene_content`
-**What it does**: Identifies key objects (people, animals, vehicles, etc.) for quick indexing.
-- **LLM Use Case**: *"Which photos in this folder contain a 'dog'?"*
-
----
-
-## 🔒 Privacy & Telemetry
-
-`photographi` is built on a **Privacy-First** philosophy. We collect high-level, anonymized usage metrics to help improve the tool, but we guarantee your personal data never leaves your machine.
-
-### Our Privacy Promise
-- **Anonymized Aggregates Only**: We **NEVER** collect file names, paths, EXIF metadata, or any identifiers. We only track total counts (e.g., "15 images processed") and quality distributions (e.g., "3 Excellent results").
-- **Zero Identification**: We do not use fingerprints, machine IDs, or cookies. Even we cannot tell which user is sending which metrics.
-- **Transparency**: You can audit exact collection logic in [`analytics.py`](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/analytics.py).
-- **Full Control**: Telemetry is enabled by default to help us improve, but you can opt-out completely with a single flag.
-
-### How to Opt-Out
-To disable all telemetry (both local logging and remote transmission), you can either set the environment variable `PHOTOGRAPHI_TELEMETRY_DISABLED=1`, or add the `--disable-telemetry` flag to your `mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "photographi": {
-      "command": "python",
-      "args": [
-        "/absolute/path/to/photographi/server.py",
-        "--disable-telemetry"
-      ]
-    }
-  }
-}
-```
-
-> **Note:**
-> **Open Source Security**: For the official release, we use a **Telemetry Relay** (proxy) to securely manage Axiom tokens. If you are forking this project, see [`docs/telemetry-relay.js`](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry-relay.js) for instructions on how to set up your own secure metrics relay.
-
----
-
----
-
-## 📚 Documentation
-
-*   **[Full Tool Reference (API)](docs/api-reference.md)**: Detailed breakdown of every tool, parameter, and return type.
-*   **[System Architecture](docs/architecture.md)**: Deep dive into the Physics/Neural engines and the Privacy-First Telemetry design.
-*   **[Telemetry Relay Setup](docs/telemetry-relay.js)**: Instructions for self-hosting the privacy proxy on Cloudflare.
-
----
-
-## 📊 Performance Benchmark
-
-| Capability | Speed (M1/M2/M3) | Description |
-| :--- | :--- | :--- |
-| **Model Load** | **~0.38s** | One-time initialization of YOLO26n ONNX model |
-| **Technical Scan** | **~0.19s** / img | **Fast Mode** (Downsampled 40MP -> 1024px) + Concurrency |
-| **Forensic Scan** | **~1.50s** / img | Full-Resolution Analysis (Opt-in via `fast_mode=False`) |
-| **Throughput** | **~18,000** img/hr | Effective batch rate for mixed workloads |
-| **Scalability** | **Unlimited** | Verified pagination support for 10,000+ folders |
-
-*Tested on local Apple Silicon hardware with 1024x1024 synthetic assets. High-resolution RAW files may vary based on disk I/O.*
-
----
-
-
-## 🔒 Privacy & Telemetry
-This tool collects anonymous usage data by default to help improve performance.
-- **Relay**: Telemetry is sent to `https://photographi-telemetry.abhishek-a-prasad.workers.dev/`.
-- **Disable**: Set `PHOTOGRAPHI_TELEMETRY_DISABLED=1` to opt-out.
-- **Data**: We collect execution time, error rates, and camera model stats. NO image data is ever uploaded.
-
-## 🤝 Contributing
-Contributions are welcome! Please read `CONTRIBUTING.md` for details.
-
----
-
-## 🏗️ Technology
-
-`photographi-mcp` is built on top of the **[photo-quality-analyzer-core](https://pypi.org/project/photo-quality-analyzer-core/)** engine. This core library provides the signal processing, physics-based metrics, and neural network logic that powers the analysis.
+Built with science. See [Technical Documentation](https://github.com/prasadabhishek/photo-quality-analyzer/blob/mainline/docs/SCIENCE.md).
 
 ---
 
