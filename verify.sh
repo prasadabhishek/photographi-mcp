@@ -14,35 +14,27 @@ echo -e "${GREEN}🚀 Starting Isolated Verification Pipeline...${NC}"
 # Ensure we are in the photographi root
 cd "$(dirname "$0")"
 PHOTOGRAPH_ROOT=$(pwd)
-VENV_PYTHON="$PHOTOGRAPH_ROOT/venv/bin/python"
 
-# Check for venv
-if [ ! -f "$VENV_PYTHON" ]; then
-    echo -e "${RED}❌ Error: Virtual environment not found at $VENV_PYTHON${NC}"
-    echo -e "Please run 'python -m venv venv && source venv/bin/activate && pip install -e .' first."
-    exit 1
+# Determine the python path
+if [ -f "$PHOTOGRAPH_ROOT/venv/bin/python" ]; then
+    VENV_PYTHON="$PHOTOGRAPH_ROOT/venv/bin/python"
+elif [ -f "$PHOTOGRAPH_ROOT/venv/Scripts/python.exe" ]; then
+    # Windows support
+    VENV_PYTHON="$PHOTOGRAPH_ROOT/venv/Scripts/python.exe"
+else
+    VENV_PYTHON="python3" # Fallback to system python
 fi
 
-echo -e "\n${GREEN}🔌 [1/2] Running MCP Server Unit Tests...${NC}"
-# No PYTHONPATH override: tests the instance installed in the environment
-$VENV_PYTHON -m unittest discover -v -s "$PHOTOGRAPH_ROOT/tests" -p 'test_*.py'
-MCP_STATUS=$?
+echo -e "\n${GREEN}🧪 [1/1] Running Unified Test Suite...${NC}"
+# Use pytest with verbose output
+$VENV_PYTHON -m pytest tests/ -v
+STATUS=$?
 
-if [ $MCP_STATUS -ne 0 ]; then
-    echo -e "${RED}❌ MCP Server Tests Failed!${NC}"
-    exit 1
+if [ $STATUS -eq 0 ]; then
+    echo -e "\n${GREEN}✅ ALL TESTS PASSED SUCCESSFULLY!${NC}"
+    echo -e "System verified using pytest."
+    exit 0
+else
+    echo -e "\n${RED}❌ Verification Failed!${NC}"
+    exit $STATUS
 fi
-
-echo -e "\n${GREEN}🔗 [2/2] Running Master Integration Suite...${NC}"
-export PYTHONPATH="$PHOTOGRAPH_ROOT"
-$VENV_PYTHON "$PHOTOGRAPH_ROOT/tests/integration/master_test_suite.py"
-INT_STATUS=$?
-
-if [ $INT_STATUS -ne 0 ]; then
-    echo -e "${RED}❌ Integration Suite Failed!${NC}"
-    exit 1
-fi
-
-echo -e "\n${GREEN}✅ ALL TESTS PASSED SUCCESSFULLY!${NC}"
-echo -e "System verified in isolation using environment-installed packages."
-exit 0

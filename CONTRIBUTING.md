@@ -35,9 +35,14 @@ pip install -e .
 ## 🧪 Testing Strategy
 We use a **Dual-Verification System**:
 1.  **Unit Tests**: Located in the base library. Verify pure physics (e.g., "Is this FFT calculation correct?").
-2.  **Integration Tests**: Located here. Verify the application (e.g., "Does the XMP file get written correctly?").
+2.  **Integration Tests**: Located here. Verify the application and MCP bridge.
 
-**Please ensure all tests pass before submitting a PR.**
+**Please ensure all tests pass before submitting a PR:**
+
+```bash
+source venv/bin/activate
+pytest tests/ -v
+```
 
 ## 🗺️ Roadmap
 We are looking for contributions in:

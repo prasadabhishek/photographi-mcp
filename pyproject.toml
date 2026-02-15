@@ -24,6 +24,14 @@ dependencies = [
     "tqdm>=4.66.0"
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "opencv-python>=4.11.0",
+    "numpy>=1.26.0"
+]
+
 [project.scripts]
 photographi = "server:main"
 

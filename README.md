@@ -22,18 +22,9 @@ For the math and signal processing details, see the **[Technical Science Documen
 
 ---
 
----
-
 ## 🔌 Installation & Setup
 
-### Prerequisites
-
-1. Install the core library dependency:
-```bash
-pip install photo-quality-analyzer-core
-```
-
-2. Install the MCP server:
+### Install via pip
 ```bash
 pip install photographi-mcp
 ```
@@ -138,10 +129,10 @@ Telemetry is enabled by default to help us improve the tool. To **disable all us
 ### 1. `photographi_analyze_photo`
 **What it does**: Performs a deep technical audit of a single image.
 - **LLM Use Case**: *"Audit this RAW file and tell me if the focus is sharp enough for a large print."*
-- **Supports**: JPEG, PNG, RAW (.ARW, .CR2, .NEF), and TIFF.
+- **Supports**: JPEG, PNG, RAW (.ARW, .CR2, .NEF, .DNG, .CR3, etc.), and TIFF.
 
 ### 2. `photographi_analyze_folder`
-**What it does**: Scans an entire folder and provides a statistical quality report.
+**What it does**: Scans an entire folder and provides a statistical quality report (with pagination).
 - **LLM Use Case**: *"I just finished a shoot; scan the 'Portraits' folder and tell me the overall success rate of the focus."*
 
 ### 3. `photographi_rank_photographs`
@@ -149,16 +140,24 @@ Telemetry is enabled by default to help us improve the tool. To **disable all us
 - **LLM Use Case**: *"I took 10 shots of this bird taking flight. Find the single frame that is the sharpest and best exposed."*
 
 ### 4. `photographi_cull_photographs`
-**What it does**: Intelligently filters out low-quality "junk" (blurry, dark, or duplicates) into a separate folder.
+**What it does**: Intelligently filters out low-quality "junk" (blurry, dark, or duplicates) into a separate `culled_photos` folder.
 - **LLM Use Case**: *"Clean up my 'Downloads' folder by moving all the low-quality or blurry screenshots to a culled folder."*
 
 ### 5. `photographi_threshold_cull`
-**What it does**: A strict "Keep or Toss" tool that sorts photos based on a specific quality score.
+**What it does**: A strict "Keep or Toss" tool that sorts photos based on a specific quality score into `selects/` or `rejects/`.
 - **LLM Use Case**: *"Be strict: sort this folder. Anything with a quality score below 0.7 goes into 'rejects', the rest go into 'selects'."*
 
 ### 6. `photographi_get_color_palette`
 **What it does**: Extracts the dominant colors from a photo (as Hex codes).
 - **LLM Use Case**: *"Look at my best landscape shots and extract a color palette I can use to design my photography portfolio website."*
+
+### 7. `photographi_get_folder_palettes`
+**What it does**: Extracts dominant colors for every image in a folder (with pagination).
+- **LLM Use Case**: *"Analyze all photos in this folder and give me their color palettes so I can group them by mood."*
+
+### 8. `photographi_get_scene_content`
+**What it does**: Identifies key objects (people, animals, vehicles, etc.) for quick indexing.
+- **LLM Use Case**: *"Which photos in this folder contain a 'dog'?"*
 
 ---
 

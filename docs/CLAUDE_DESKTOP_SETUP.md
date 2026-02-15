@@ -8,7 +8,6 @@ This guide shows how to integrate the **photographi** MCP server with Claude Des
 
 1. **Claude Desktop** installed on macOS
 2. **photographi** installed in a virtual environment
-3. **photo-quality-analyzer-core** installed (dependency)
 
 ---
 
@@ -23,11 +22,8 @@ From the `photographi` directory:
 python3 -m venv venv
 source venv/bin/activate
 
-# Install the core library
-pip install /Users/abhishekprasad/workspace/photo-quality-analyzer
-
-# Install the MCP server
-pip install -e .
+# Install the MCP server (automatically installs dependencies)
+pip install photographi-mcp
 ```
 
 ### 2. Configure Claude Desktop
@@ -165,20 +161,11 @@ Expected response should include:
 Add to the `env` block in Claude Desktop config:
 ```json
 "env": {
-  "PYTHONPATH": "/Users/abhishekprasad/workspace/photographi",
-  "PQA_DISABLE_TELEMETRY": "1"
+  "PHOTOGRAPHI_TELEMETRY_DISABLED": "1"
 }
 ```
 
-### Custom YOLO Model
-
-If you have a custom trained model:
-```json
-"env": {
-  "PYTHONPATH": "/Users/abhishekprasad/workspace/photographi",
-  "PQA_MODEL_PATH": "/path/to/custom/model.onnx"
-}
-```
+---
 
 ---
 
