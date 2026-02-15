@@ -6,7 +6,7 @@ import shutil
 import argparse
 import time
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 import logging
 import gc
 from typing import Annotated, Literal

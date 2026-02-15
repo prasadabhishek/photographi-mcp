@@ -24,7 +24,10 @@ For the math and signal processing details, see the **[Technical Science Documen
 
 ## ⚡ Quick Start: Zero-Install
 
-The fastest way to use `photographi` is via **Claude CLI** (Claude Code) or **uvx**. No manual installation required.
+The fastest way to use `photographi` is via **Claude CLI** (Claude Code) or **uvx**.
+
+> [!NOTE]
+> These methods require **[uv](https://docs.astral.sh/uv/getting-started/installation/)** to be installed on your system.
 
 ### 1. Claude CLI (Claude Code)
 Run this single command to automatically configure the server:

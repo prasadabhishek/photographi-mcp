@@ -14,7 +14,10 @@ This guide covers the installation, configuration, and troubleshooting of the **
 
 ## 📥 Zero-Install Setup (Recommended)
 
-The fastest way to run `photographi` is via **Claude CLI** (Claude Code) or **uvx**. These methods require no manual virtual environment management.
+The fastest way to run `photographi` is via **Claude CLI** (Claude Code) or **uvx**.
+
+> [!IMPORTANT]
+> These methods require **[uv](https://docs.astral.sh/uv/getting-started/installation/)** to be installed on your system.
 
 ### Claude CLI (Claude Code)
 Install and configure automatically with a single command:
