@@ -12,57 +12,57 @@ This guide covers the installation, configuration, and troubleshooting of the **
 
 ---
 
-## 📥 Installation
+## 📥 Zero-Install Setup (Recommended)
 
-### Option 1: Install via pip (Recommended)
-Automatically installs the server and all necessary visual intelligence dependencies:
-```bash
-pip install photographi-mcp
+The easiest way to run `photographi` is using `uvx`. This requires no manual installation or virtual environment management.
+
+### Claude Desktop
+Add this to your `claude_desktop_config.json`:
+**Path**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "photographi": {
+      "command": "uvx",
+      "args": ["photographi-mcp"]
+    }
+  }
+}
 ```
 
-### Option 2: Local Development (Source)
-If you are developing or forking the engine:
-```bash
-git clone https://github.com/prasadabhishek/photographi.git
-cd photographi
-python3 -m venv venv
-source venv/bin/activate
-pip install -e .
+### GitHub Copilot CLI
+Add this to your `~/.config/github-copilot/config.json`:
+
+```json
+{
+  "mcp_servers": {
+    "photographi": {
+      "command": "uvx",
+      "args": ["photographi-mcp"]
+    }
+  }
+}
 ```
 
 ---
 
-## ⚙️ Configuration (Claude Desktop)
+## 🛠️ Advanced: Local Development Setup
 
-Add the following to your `claude_desktop_config.json`:
-**Path**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+If you are developing or want to use a local clone:
 
-### Standard Setup
-```json
-{
-  "mcpServers": {
-    "photographi": {
-      "command": "photographi",
-      "args": []
-    }
-  }
-}
-```
+1. **Install in Editable Mode**:
+   ```bash
+   pip install -e .
+   ```
 
-### Development Setup (Source)
-```json
-{
-  "mcpServers": {
-    "photographi": {
-      "command": "/Users/YOUR_USERNAME/workspace/photographi/venv/bin/python",
-      "args": ["-m", "server"],
-      "env": {
-        "PYTHONPATH": "/Users/YOUR_USERNAME/workspace/photographi"
-      }
-    }
-  }
-}
-```
+2. **Manual Configuration**:
+   ```json
+   "photographi": {
+     "command": "photographi",
+     "args": []
+   }
+   ```
 
 ---
 

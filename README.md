@@ -22,87 +22,67 @@ For the math and signal processing details, see the **[Technical Science Documen
 
 ---
 
-## 🔌 Installation & Setup
+## ⚡ Quick Start: Zero-Install
 
-### Install via pip
-```bash
-pip install photographi-mcp
-```
+The easiest way to use `photographi` is via `uvx`. No manual installation required.
 
----
-
-### Option A: Claude Desktop Integration
-
-**Configuration File**: `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
+### 1. Claude Desktop (macOS)
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "photographi": {
-      "command": "photographi",
-      "args": []
+      "command": "uvx",
+      "args": ["photographi-mcp"]
     }
   }
 }
 ```
 
-**For Development (Source Installation)**:
+### 2. GitHub Copilot CLI
+Add this to `~/.config/github-copilot/config.json`:
+
 ```json
 {
-  "mcpServers": {
+  "mcp_servers": {
     "photographi": {
-      "command": "/Users/YOUR_USERNAME/workspace/photographi/venv/bin/python",
-      "args": ["-m", "server"],
-      "env": {
-        "PYTHONPATH": "/Users/YOUR_USERNAME/workspace/photographi"
-      }
+      "command": "uvx",
+      "args": ["photographi-mcp"]
     }
   }
 }
 ```
-
-Restart Claude Desktop after saving the configuration.
-
-📖 **Detailed Guide**: See [docs/setup.md](docs/setup.md)
 
 ---
 
-### Option B: GitHub Copilot CLI Integration
+## 🛠️ Advanced: Local Development
 
-**Configuration File**: `~/.config/github-copilot/config.json`
+If you want to contribute or edit the source code:
 
-```json
-{
-  "mcp_servers": {
-    "photographi": {
-      "command": "photographi",
-      "args": []
-    }
-  }
-}
-```
+1. **Setup**:
+   ```bash
+   git clone https://github.com/prasadabhishek/photographi.git
+   cd photographi
+   pip install -e .
+   ```
 
-**For Development (Source Installation)**:
-```json
-{
-  "mcp_servers": {
-    "photographi": {
-      "command": "/Users/YOUR_USERNAME/workspace/photographi/venv/bin/python",
-      "args": ["-m", "server"],
-      "env": {
-        "PYTHONPATH": "/Users/YOUR_USERNAME/workspace/photographi"
-      }
-    }
-  }
-}
-```
+2. **Configuration**:
+   Point your `command` to the local `photographi` executable or use the absolute path to your venv's python.
 
-Restart your terminal session to activate the MCP server.
+📖 **Full Documentation**: See [docs/setup.md](docs/setup.md)
 
 **Quick Test**:
 ```bash
-gh copilot explain "Use photographi to analyze this image: /path/to/photo.jpg"
+uvx photographi-mcp --help
 ```
+
+---
+
+## 🗺️ Roadmap & Community
+We are building the future of privacy-first visual AI. See **[CONTRIBUTING.md](CONTRIBUTING.md)** to get involved.
+
+**License**: MIT
 
 ---
 
