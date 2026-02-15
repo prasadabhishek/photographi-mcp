@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Culling Logic**: `photographi_cull_photographs` now keeps "Selects" in their original folder and ONLY moves "Rejects" to a `culled_photos/` subfolder. This is a non-breaking workflow improvement.
 - **Defaults**: Increased default `limit` from 50 to 100 for all batch tools to reduce pagination friction.
+- **Tool Descriptions**: Improved all MCP tool docstrings to be more actionable and LLM-friendly:
+  - Clearly explain what each tool does and when to use it
+  - Document the new culling behavior (selects stay in place)
+  - Standardize `fast_mode` parameter descriptions across all tools
+  - Add return format details and use case guidance
 - **Docs**: Clarified `fast_mode=True` default in all tool descriptions.
 
 ## [0.2.1] - 2026-02-15

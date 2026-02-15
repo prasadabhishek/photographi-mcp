@@ -317,9 +317,13 @@ def photographi_analyze_photo(
     metrics: Annotated[list[str], Field(description="Specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition).")] = None,
     enable_subject_detection: bool = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
-    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to True (4-8x faster). Set to False for full-resolution 'Forensic Precision' mode (much slower on 40MP+ files).")] = True
 ) -> dict:
-    """Performs Studio-Grade technical analysis on a single photo."""
+    """
+    Analyzes a single photo for technical quality (sharpness, exposure, noise, etc.).
+    Returns overall score, judgement, and per-metric breakdowns.
+    Use this for detailed inspection of individual images. For batch analysis, use photographi_analyze_folder.
+    """
     analytics.track_tool_invocation("photographi_analyze_photo")
     return _analyze_photo_logic(image_path, metrics, enable_subject_detection, model_size, fast_mode)
 
@@ -331,12 +335,13 @@ def photographi_analyze_folder(
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
     limit: Annotated[int, Field(description="Batch size for pagination.")] = 100,
     offset: Annotated[int, Field(description="Pagination offset. Increment this by 'limit' to see more results.")] = 0,
-    fast_mode: Annotated[bool, Field(description="Enabled by default. Set to False for 'Forensic Precision' (full-res analysis, much slower on 40MP+).")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to True (4-8x faster). Set to False for full-resolution 'Forensic Precision' mode (much slower on 40MP+ files).")] = True
 ) -> dict:
     """
-    Batch analyzes a folder with high concurrency (4-8 images at once).
-    Use 'limit' and 'offset' to manage large folders. If 'nextOffset' is present in the response, 
-    call this tool again with that offset to continue analysis.
+    Batch analyzes all images in a folder with high concurrency (4-8 images at once).
+    Returns quality scores and judgements for each image. Default limit is 100 images per call.
+    Use 'limit' and 'offset' for pagination. If 'nextOffset' is in the response, call again with that offset.
+    Perfect for understanding the overall quality distribution of a shoot.
     """
     analytics.track_tool_invocation("photographi_analyze_folder")
     return _analyze_folder_logic(folder_path, metrics, enable_subject_detection, model_size, limit, offset, fast_mode)
@@ -350,12 +355,13 @@ def photographi_rank_photographs(
     metrics: Annotated[list[str], Field(description="Specific metrics for ranking.")] = None,
     enable_subject_detection: bool = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
-    fast_mode: Annotated[bool, Field(description="Enabled by default for responsiveness. Set to False for full-resolution forensic evaluation.")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to True (4-8x faster). Set to False for full-resolution 'Forensic Precision' mode (much slower on 40MP+ files).")] = True
 ) -> dict:
     """
-    Ranks photos by technical quality using high concurrency.
-    Useful for finding the 'best' frame in a high-speed sequence.
-    Supports pagination via 'limit' and 'offset' for large sets.
+    Ranks photos by technical quality and returns the top_n best images.
+    Uses high concurrency to process up to 100 images per call (default limit).
+    Ideal for burst sequences or finding hero shots. Returns detailed metrics for each top image.
+    For full folder analysis, use photographi_analyze_folder instead.
     """
     analytics.track_tool_invocation("photographi_rank_photographs")
     return _rank_folder_logic(folder_path, top_n, limit, offset, metrics, enable_subject_detection, model_size, fast_mode)
@@ -364,16 +370,18 @@ def photographi_rank_photographs(
 def photographi_cull_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     threshold: Annotated[float, Field(description="Overall score threshold (0.0-1.0). Images below this are culled.")] = 0.4,
-    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull action (move files or tag XMP).")] = "move",
+    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Action to perform: 'move' (files to subfolder), 'xmp' (sidecar tags only), or 'both'.")] = "move",
     enable_subject_detection: bool = True,
-    limit: Annotated[int, Field(description="Number of images to cull in this batch.")] = 100,
+    limit: Annotated[int, Field(description="Number of images to process in this batch.")] = 100,
     offset: Annotated[int, Field(description="Pagination offset.")] = 0,
-    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to True (4-8x faster). Set to False for full-resolution 'Forensic Precision' mode (much slower on 40MP+ files).")] = True
 ) -> dict:
     """
-    Filters low-quality images using concurrency.
-    Process folders in batches using 'limit' and 'offset'.
-    Highly concurrent (4-8 images at once).
+    Culls low-quality images by moving them to a 'culled_photos' subfolder.
+    Images ABOVE the threshold (default 0.4) stay in the original folder.
+    Images BELOW the threshold are moved to culled_photos/. 
+    Processes 100 images per call by default. Use 'limit' and 'offset' for pagination.
+    Mode options: 'move' (default), 'xmp' (sidecar tagging), or 'both'.
     """
     analytics.track_tool_invocation("photographi_cull_photographs")
     return _cull_logic(folder_path, threshold, mode, False, None, enable_subject_detection, "nano", limit, offset, fast_mode)
@@ -382,13 +390,18 @@ def photographi_cull_photographs(
 def photographi_threshold_cull(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     min_confidence: float = 0.6,
-    mode: Literal["move", "xmp", "both"] = "move",
+    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Action to perform: 'move' (files to subfolder), 'xmp' (sidecar tags only), or 'both'.")] = "move",
     enable_subject_detection: bool = True,
     limit: int = 100,
     offset: int = 0,
-    fast_mode: Annotated[bool, Field(description="Defaults to TRUE. Performs 4-8x faster analysis by downsampling high-res images.")] = True
+    fast_mode: Annotated[bool, Field(description="Defaults to True (4-8x faster). Set to False for full-resolution 'Forensic Precision' mode (much slower on 40MP+ files).")] = True
 ) -> dict:
-    """Binary threshold culling using concurrency and pagination."""
+    """
+    Binary threshold culling: moves images below min_confidence (default 0.6) to a 'rejects' subfolder.
+    Images ABOVE the threshold stay in the original folder. Similar to photographi_cull_photographs,
+    but uses a higher default threshold and 'rejects/' folder name for stricter filtering.
+    Processes 100 images per call. Mode options: 'move', 'xmp', or 'both'.
+    """
     analytics.track_tool_invocation("photographi_threshold_cull")
     return _cull_logic(folder_path, min_confidence, mode, True, None, enable_subject_detection, "nano", limit, offset, fast_mode)
 
@@ -397,7 +410,11 @@ def photographi_get_color_palette(
     image_path: Annotated[str, Field(description="Absolute path to image.")],
     colors: int = 5
 ) -> dict:
-    """Extracts a representative color palette using K-Means Clustering."""
+    """
+    Extracts a representative color palette from a single image using K-Means clustering.
+    Returns a list of hex color codes (e.g., ['#FF5733', '#33FF57', ...]). Default is 5 colors.
+    Use this for design inspiration or color grading reference.
+    """
     analytics.track_tool_invocation("photographi_get_color_palette")
     palette = generate_color_palette(image_path, colors)
     return {"colors": palette}
@@ -406,7 +423,11 @@ def photographi_get_color_palette(
 def photographi_get_scene_content(
     image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")]
 ) -> dict:
-    """Returns a clean list of detected objects (e.g., person, dog, car)."""
+    """
+    Detects objects in a photo using YOLO (e.g., person, dog, car, etc.).
+    Returns a simple list of object labels. Use this for quick scene indexing or content-based search.
+    For full quality analysis with subject-aware metering, use photographi_analyze_photo.
+    """
     analytics.track_tool_invocation("photographi_get_scene_content")
     try:
         objects = detect_objects(image_path)
@@ -444,7 +465,11 @@ def photographi_get_folder_palettes(
     limit: int = 20,
     offset: int = 0
 ) -> dict:
-    """Batch color palette extraction with pagination."""
+    """
+    Extracts color palettes from multiple images in a folder.
+    Processes 20 images per call by default. Use 'limit' and 'offset' for pagination.
+    Returns a map of filename → color palette. Useful for building color-based galleries or moodboards.
+    """
     analytics.track_tool_invocation("photographi_get_folder_palettes")
     return _bulk_palette_logic(folder_path, colors, limit, offset)
 
