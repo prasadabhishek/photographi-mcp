@@ -6,8 +6,9 @@ import shutil
 import argparse
 import time
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 import logging
+import sys
 import gc
 from typing import Annotated, Literal
 
@@ -23,8 +24,8 @@ from photo_quality_analyzer_core.analyzer import (
 )
 from analytics import analytics
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging - Force to stderr to avoid breaking MCP protocol
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("photographi-mcp")
 
 # Initialize MCP server
