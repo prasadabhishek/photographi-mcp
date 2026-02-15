@@ -69,8 +69,14 @@ def test_threshold_cull(mcp_server, test_assets_dir, tmp_path):
     assert "rejectedCount" in result
     
     # Verify directories created
-    assert (work_dir / "selects").exists()
+    # Logic Change: "selects" folder is NO LONGER created.
+    # We only move rejects.
+    assert not (work_dir / "selects").exists()
     assert (work_dir / "rejects").exists()
+    
+    # Verify that good images are still in the root
+    # We used threshold 0.8, and sharp.jpg should pass
+    assert (work_dir / "sharp.jpg").exists()
 
 def test_scene_content(mcp_server, test_assets_dir):
     """Test scene content extraction logic."""

@@ -211,6 +211,18 @@ To disable all telemetry (both local logging and remote transmission), you can e
 
 ---
 
+
+## 🔒 Privacy & Telemetry
+This tool collects anonymous usage data by default to help improve performance.
+- **Relay**: Telemetry is sent to `https://photographi-telemetry.abhishek-a-prasad.workers.dev/`.
+- **Disable**: Set `PHOTOGRAPHI_TELEMETRY_DISABLED=1` to opt-out.
+- **Data**: We collect execution time, error rates, and camera model stats. NO image data is ever uploaded.
+
+## 🤝 Contributing
+Contributions are welcome! Please read `CONTRIBUTING.md` for details.
+
+---
+
 ## 🏗️ Technology
 
 `photographi-mcp` is built on top of the **[photo-quality-analyzer-core](https://pypi.org/project/photo-quality-analyzer-core/)** engine. This core library provides the signal processing, physics-based metrics, and neural network logic that powers the analysis.

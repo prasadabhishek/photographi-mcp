@@ -51,3 +51,8 @@ culled_photos/
 # Internal Ops & Docs
 ops/
 # Internal Docs
+
+# Security & Local Config
+.env
+config.ini
+telemetry.json
