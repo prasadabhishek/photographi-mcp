@@ -56,16 +56,17 @@ def test_threshold_cull(mcp_server, test_assets_dir, tmp_path):
     
     # Set high threshold so only sharp output passes
     # Note: Synthetic sharp image might have high score
-    result = mcp_server._threshold_cull_logic(
+    result = mcp_server._cull_logic(
         str(work_dir), 
-        min_confidence=0.8, 
+        threshold=0.8, # logic maps 'threshold' to 'min_confidence' internally if needed or just passes it
         mode="move", 
-        enable_subject_detection=False
+        enable_subject_detection=False,
+        is_threshold_mode=True
     )
     
     assert result["status"] == "Threshold Culling Complete"
-    assert "selectsCount" in result
-    assert "rejectsCount" in result
+    assert "keptCount" in result
+    assert "rejectedCount" in result
     
     # Verify directories created
     assert (work_dir / "selects").exists()

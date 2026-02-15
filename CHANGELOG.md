@@ -5,6 +5,11 @@ All notable changes to the `photographi-mcp` project will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-02-15
+
+### Fixed
+- **Performance Hotfix**: Critical fix for RAW file loading in Fast Mode. Previously, the engine loaded full-resolution RAW data before downsampling for `photographi_cull_photographs`. Now, it correctly uses `rawpy` embedded thumbnails or previews, restoring sub-second analysis speeds.
+
 ## [0.2.0] - 2026-02-15
 
 ### ⚡ Performance & Scalability

@@ -5,11 +5,10 @@ import os
 import shutil
 import argparse
 import time
-
-__version__ = "0.1.3"
 import logging
 import sys
 import gc
+import concurrent.futures
 from typing import Annotated, Literal
 
 from pydantic import Field
@@ -33,7 +32,6 @@ mcp = FastMCP("photographi")
 def _validate_path(path: str, must_exist: bool = True, expected_type: Literal["file", "dir", "any"] = "any") -> str:
     """
     Validates a file path for security and existence.
-    Returns the absolute path if valid, raises ValueError if not.
     """
     if not path:
         raise ValueError("Path cannot be empty")
@@ -51,47 +49,42 @@ def _validate_path(path: str, must_exist: bool = True, expected_type: Literal["f
             
     return abs_path
 
-def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
+def _process_single_image(
+    filename: str,
+    folder_path: str,
+    metrics: list[str] = None,
+    enable_subject_detection: bool = True,
+    model_size: str = "nano",
+    fast_mode: bool = False
+) -> dict:
     """
-    Core engine bridge for single image assessment.
+    General purpose worker for concurrent image analysis.
     """
-    try:
-        image_path = _validate_path(image_path, expected_type="file")
-    except ValueError as e:
-        analytics.track_error()
-        return {"error": str(e)}
-        
-    # Resolve relocated model path
-    model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "models")
-    model_filename = "yolo26n.onnx" if model_size == "nano" else "yolo11x.onnx"
-    full_model_path = os.path.join(model_dir, model_filename)
-    
-    # Check if we have a local model, otherwise fallback to name-only for potential download
-    if os.path.exists(full_model_path):
-        model_size_or_path = full_model_path
-    else:
-        model_size_or_path = model_size
-
-    # Track tool invocation already handled in wrapper, 
-    # but we track specific technical details here
-    format_ext = os.path.splitext(image_path)[1]
-    
+    path = os.path.join(folder_path, filename)
+    format_ext = os.path.splitext(path)[1]
     start_time = time.time()
     try:
-        # We don't have a direct way to measure "load time" separately here 
-        # because evaluate_photo_quality handles it internally, but we can 
-        # measure the total processing hit.
-        res = evaluate_photo_quality(image_path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size_or_path)
+        # Resolve relocated model path if necessary
+        model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "models")
+        model_filename = "yolo26n.onnx" if model_size == "nano" else "yolo11x.onnx"
+        full_model_path = os.path.join(model_dir, model_filename)
+        model_ptr = full_model_path if os.path.exists(full_model_path) else model_size
+
+        res = evaluate_photo_quality(
+            path, 
+            requested_metrics=metrics, 
+            enable_subject_detection=enable_subject_detection, 
+            model_size=model_ptr,
+            force_downsample=fast_mode
+        )
         end_time = time.time()
         
-        # Track Performance
+        # Telemetry
         analytics.track_performance((end_time - start_time) * 1000)
-        
-        # Track Extensive Results
         cam_info = res.get("cameraInfo", {})
         analytics.track_analysis_results(
-            judgement=res.get("judgement", "Unknown"), 
-            format_ext=format_ext, 
+            judgement=res.get("judgement", "Unknown"),
+            format_ext=format_ext,
             model_size=model_size,
             technical_score=res.get("technicalScore", 0),
             aesthetic_score=res.get("aestheticScore", 0),
@@ -103,546 +96,343 @@ def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subj
         if enable_subject_detection:
             analytics.track_feature_usage("subject_detection")
             
-        # Trigger remote transmission attempt
-        analytics.transmit_telemetry()
+        # Return full result but allow caller to filter
+        res["filename"] = filename
+        res["path"] = path
         return res
     except Exception as e:
-        error_name = type(e).__name__
-        analytics.track_error(error_name)
-        logger.error(f"Error analyzing {image_path}: {e}")
-        return {"error": str(e)}
+        logger.error(f"Failed to analyze {filename}: {e}")
+        return {"filename": filename, "error": str(e), "overallConfidence": 0}
+    finally:
+        gc.collect()
 
-def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", limit: int = 10, offset: int = 0) -> list[dict]:
-    """
-    Batch processing pipeline for directory-scale analysis with pagination.
-    """
+def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", fast_mode: bool = False) -> dict:
+    """Single image assessment bridge."""
+    try:
+        image_path = _validate_path(image_path, expected_type="file")
+    except ValueError as e:
+        return {"error": str(e)}
+    
+    # Use the helper even for single images to keep logic centralized
+    return _process_single_image(os.path.basename(image_path), os.path.dirname(image_path), metrics, enable_subject_detection, model_size, fast_mode)
+
+def _batch_executor(
+    folder_path: str,
+    paginated_files: list[str],
+    metrics: list[str],
+    enable_subject_detection: bool,
+    model_size: str,
+    fast_mode: bool
+) -> list[dict]:
+    """Internal helper to run the thread pool."""
+    max_workers = min(os.cpu_count() or 4, len(paginated_files))
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_file = {
+            executor.submit(
+                _process_single_image,
+                fname,
+                folder_path,
+                metrics,
+                enable_subject_detection,
+                model_size,
+                fast_mode
+            ): fname for fname in paginated_files
+        }
+        for future in concurrent.futures.as_completed(future_to_file):
+            results.append(future.result())
+    return results
+
+def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", limit: int = 10, offset: int = 0, fast_mode: bool = False) -> dict:
+    """Batch analysis with concurrency and pagination."""
     try:
         folder_path = _validate_path(folder_path, expected_type="dir")
     except ValueError as e:
         return {"error": str(e)}
     
-    # Sort for stability
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
-    if not image_files:
-        return {"message": "No images found in the folder."}
+    if not image_files: return {"message": "No images found."}
     
-    # Apply pagination
     total_images = len(image_files)
     paginated_files = image_files[offset : offset + limit]
+    if not paginated_files: return {"message": "No more images in range.", "totalImages": total_images}
 
-    if not paginated_files:
-        return {
-            "message": "No more images in this range.",
-            "totalImages": total_images,
-            "nextOffset": None
-        }
-
-    results = {}
-    total_confidence = 0
+    raw_results = _batch_executor(folder_path, paginated_files, metrics, enable_subject_detection, model_size, fast_mode)
     
-    for filename in paginated_files:
-        image_path = os.path.join(folder_path, filename)
-        format_ext = os.path.splitext(image_path)[1]
-        start_time = time.time()
-        try:
-            result = evaluate_photo_quality(image_path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
-            end_time = time.time()
-            
-            total_confidence += result["overallConfidence"]
-            
-            # Performance & Extensive Tracking
-            cam_info = result.get("cameraInfo", {})
-            analytics.track_performance((end_time - start_time) * 1000)
-            analytics.track_analysis_results(
-                judgement=result.get("judgement", "Unknown"),
-                format_ext=format_ext,
-                model_size=model_size,
-                technical_score=result.get("technicalScore", 0),
-                aesthetic_score=result.get("aestheticScore", 0),
-                overall_score=result.get("overallConfidence", 0),
-                camera_make=cam_info.get("make"),
-                camera_model=cam_info.get("model"),
-                lens_model=cam_info.get("lens")
-            )
-            if enable_subject_detection:
-                analytics.track_feature_usage("subject_detection")
-            
-            results[filename] = {
-                "judgement": result["judgement"],
-                "score": round(result["overallConfidence"], 3),
-                "summary": result.get("reasoning", {}).get("technical", "Good.")
+    # Filter for output cleanliness
+    formatted_results = {}
+    total_conf = 0
+    for res in raw_results:
+        if "error" in res:
+            formatted_results[res["filename"]] = {"error": res["error"]}
+        else:
+            total_conf += res["overallConfidence"]
+            formatted_results[res["filename"]] = {
+                "judgement": res["judgement"],
+                "score": round(res["overallConfidence"], 3),
+                "summary": res.get("reasoning", {}).get("technical", "Good.")
             }
-        except Exception as e:
-            analytics.track_error()
-            results[filename] = {"error": str(e)}
-        gc.collect()
             
-    avg_conf = round(total_confidence / len(paginated_files), 3) if paginated_files else 0
-    
     response = {
         "status": "Analysis Complete",
         "totalImagesInFolder": total_images,
-        "scanned": len(results),
+        "processed": len(raw_results),
         "offset": offset,
         "limit": limit,
-        "averageConfidence": avg_conf,
-        "results": results
+        "averageConfidence": round(total_conf / len(raw_results), 3) if raw_results else 0,
+        "results": formatted_results
     }
-    
     if offset + limit < total_images:
         response["nextOffset"] = offset + limit
-        response["note"] = f"Processed items {offset} to {offset + len(results)}. Use offset={offset+limit} to continue."
-        
-    # Trigger remote transmission attempt
+    
     analytics.transmit_telemetry()
     return response
 
-def _rank_folder_logic(folder_path: str, top_n: int = 10, limit: int = 50, offset: int = 0, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> list[dict]:
-    """
-    Burst-selection Intelligence: Finding the sharpest needle in the haystack.
-    """
+def _rank_folder_logic(folder_path: str, top_n: int = 10, limit: int = 50, offset: int = 0, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", fast_mode: bool = False) -> dict:
+    """Concurrent ranking logic."""
     try:
         folder_path = _validate_path(folder_path, expected_type="dir")
     except ValueError as e:
         return {"error": str(e)}
 
-    # Ensure subfolders exististent pagination
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
-    if not image_files:
-        return {"message": "No images found."}
+    if not image_files: return {"message": "No images found."}
 
-    # Apply pagination
     total_images = len(image_files)
     paginated_files = image_files[offset : offset + limit]
-    
-    if not paginated_files:
-        return {
-            "message": "No more images in this range.",
-            "totalImages": total_images,
-            "nextOffset": None
-        }
-        
-    scored_images = []
-    # Only process the pagination window
-    for filename in paginated_files:
-        path = os.path.join(folder_path, filename)
-        format_ext = os.path.splitext(path)[1]
-        start_time = time.time()
-        try:
-            res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
-            end_time = time.time()
-            
-            scored_images.append({
-                "filename": filename,
-                "score": round(res["overallConfidence"], 3),
-                "judgement": res["judgement"],
-                "summary": res.get("judgementDescription", ""),
-                "technicalScore": round(res.get("technicalScore", 0), 2),
-                "aestheticScore": round(res.get("aestheticScore", 0), 2),
-                "metrics": {
-                    "sharpness": round(res.get("metrics", {}).get("sharpness", {}).get("score", 0), 2),
-                    "exposure": round(res.get("metrics", {}).get("exposure", {}).get("score", 0), 2),
-                    "noise": round(res.get("metrics", {}).get("noise", {}).get("score", 0), 2),
-                    "color": round(res.get("metrics", {}).get("color", {}).get("score", 0), 2),
-                    "dynamicRange": round(res.get("metrics", {}).get("dynamicRange", {}).get("score", 0), 2),
-                    "focus": round(res.get("metrics", {}).get("focus", {}).get("score", 0), 2) if "focus" in res.get("metrics", {}) else None
-                }
-            })
-            
-            # Performance & Extensive Tracking
-            cam_info = res.get("cameraInfo", {})
-            analytics.track_performance((end_time - start_time) * 1000)
-            analytics.track_analysis_results(
-                judgement=res.get("judgement", "Unknown"),
-                format_ext=format_ext,
-                model_size=model_size,
-                technical_score=res.get("technicalScore", 0),
-                aesthetic_score=res.get("aestheticScore", 0),
-                overall_score=res.get("overallConfidence", 0),
-                camera_make=cam_info.get("make"),
-                camera_model=cam_info.get("model"),
-                lens_model=cam_info.get("lens")
-            )
-            if enable_subject_detection:
-                analytics.track_feature_usage("subject_detection")
+    if not paginated_files: return {"message": "No more images.", "totalImages": total_images}
 
-        except Exception as e:
-            analytics.track_error(type(e).__name__)
-            logger.error(f"Failed to rank {filename}: {e}")
-            continue
-        gc.collect()
-            
-    scored_images.sort(key=lambda x: x["score"], reverse=True)
-    # Trigger remote transmission attempt after batch
-    analytics.transmit_telemetry()
+    raw_results = _batch_executor(folder_path, paginated_files, metrics, enable_subject_detection, model_size, fast_mode)
+    
+    # Sort and format
+    scored = []
+    for res in raw_results:
+        if "error" in res: continue
+        scored.append({
+            "filename": res["filename"],
+            "score": round(res["overallConfidence"], 3),
+            "judgement": res["judgement"],
+            "summary": res.get("judgementDescription", ""),
+            "technicalScore": round(res.get("technicalScore", 0), 2),
+            "metrics": {k: round(v.get("score", 0), 2) for k, v in res.get("metrics", {}).items() if isinstance(v, dict)}
+        })
+    
+    scored.sort(key=lambda x: x["score"], reverse=True)
     
     response = {
-        "status": "Ranking Complete", 
+        "status": "Ranking Complete",
         "totalImagesInFolder": total_images,
-        "scanned": len(scored_images),
+        "processed": len(scored),
         "offset": offset,
         "limit": limit,
-        "bestImages": scored_images[:top_n]
+        "bestImages": scored[:top_n]
     }
-    
     if offset + limit < total_images:
         response["nextOffset"] = offset + limit
-        response["note"] = f"Processed items {offset} to {offset + len(scored_images)}. Use offset={offset+limit} to continue."
-        
+
+    analytics.transmit_telemetry()
     return response
 
-def _threshold_cull_logic(folder_path: str, min_confidence: float = 0.6, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
-    """
-    Binary culling based on strict confidence threshold.
-    
-    Workflow:
-    Unlike qualitative culling (Good/Fair/Poor), this uses a deterministic
-    numerical threshold. Images >= min_confidence go to 'selects/', 
-    others to 'rejects/'.
-    
-    Ideal for: High-volume shoots where you want binary decisions
-    (e.g., "Keep anything above 0.7").
-    """
-    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return {"error": "Directory not found."}
-        
-    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")]
-    if not image_files:
-        return {"message": "No images found."}
-        
-    selects_dir = os.path.join(folder_path, "selects")
-    rejects_dir = os.path.join(folder_path, "rejects")
-    
-    if mode in ["move", "both"]:
-        os.makedirs(selects_dir, exist_ok=True)
-        os.makedirs(rejects_dir, exist_ok=True)
-    
-    selects = []
-    rejects = []
-    
-    for filename in image_files:
-        path = os.path.join(folder_path, filename)
-        format_ext = os.path.splitext(path)[1]
-        start_time = time.time()
-        try:
-            res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
-            end_time = time.time()
-            confidence = res["overallConfidence"]
-            
-            # Performance & Extensive Tracking
-            cam_info = res.get("cameraInfo", {})
-            analytics.track_performance((end_time - start_time) * 1000)
-            analytics.track_analysis_results(
-                judgement=res.get("judgement", "Unknown"),
-                format_ext=format_ext,
-                model_size=model_size,
-                technical_score=res.get("technicalScore", 0),
-                aesthetic_score=res.get("aestheticScore", 0),
-                overall_score=res.get("overallConfidence", 0),
-                camera_make=cam_info.get("make"),
-                camera_model=cam_info.get("model"),
-                lens_model=cam_info.get("lens")
-            )
-            if enable_subject_detection:
-                analytics.track_feature_usage("subject_detection")
-
-            target_list = selects if confidence >= min_confidence else rejects
-            target_dir = selects_dir if confidence >= min_confidence else rejects_dir
-            
-            actions = []
-            if mode in ["xmp", "both"]:
-                status = "Keep" if confidence >= min_confidence else "Rejected"
-                create_xmp_sidecar(path, status, confidence)
-                actions.append("XMP-Tagged")
-                analytics.track_feature_usage("xmp_sidecar")
-                
-            if mode in ["move", "both"]:
-                try:
-                    dest = os.path.join(target_dir, filename)
-                    shutil.move(path, dest)
-                    xmp_path = os.path.splitext(path)[0] + ".xmp"
-                    if os.path.exists(xmp_path):
-                        shutil.move(xmp_path, os.path.join(target_dir, os.path.basename(xmp_path)))
-                    actions.append("Moved")
-                except Exception as e:
-                    logger.error(f"Failed to move {filename}: {e}")
-                    actions.append("Move-Failed")
-                    
-            target_list.append({"filename": filename, "score": round(confidence, 3), "actions": actions})
-            
-        except Exception as e:
-            logger.error(f"Failed to analyze {filename}: {e}")
-            continue
-        gc.collect()
-    
-    return {
-        "status": "Threshold Culling Complete",
-        "threshold": min_confidence,
-        "totalImagesScanned": len(image_files),
-        "selectsCount": len(selects),
-        "rejectsCount": len(rejects),
-        "selects": selects[:10],  # Sample
-        "rejects": rejects[:10]   # Sample
-    }
-
-def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: int = None, mode: str = "move", metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
-    """
-    Automated Content Culling and Asset Management.
-    
-    Decision Logic:
-    1. Every photo is evaluated using the full technical + aesthetic pipeline.
-    2. Any photo with an `overallConfidence` below the `threshold` is flagged.
-    
-    Action Modes:
-    - `move`: Physically relocates rejected shots to a `culled_photos` folder.
-    - `xmp`: Generates XMP sidecars with "Rejected" labels (Safe path).
-    - `both`: Performs relocation and metadata tagging.
-    
-    Science of 'Keep Best N':
-    Ensures that even in a low-quality burst, the top N frames are preserved, 
-    preventing over-aggressive data loss.
-    """
-    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return {"error": "Directory not found."}
+def _cull_logic(folder_path: str, threshold: float = 0.4, mode: str = "move", is_threshold_mode: bool = False, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano", limit: int = 50, offset: int = 0, fast_mode: bool = False) -> dict:
+    """Unified concurrent culling logic (Threshold vs Qualitative)."""
     try:
         folder_path = _validate_path(folder_path, expected_type="dir")
     except ValueError as e:
         return {"error": str(e)}
-        
-    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS)]
-    if not image_files:
-        return {"message": "No images found."}
-        
-    scored_images = []
-    for filename in image_files:
-        path = os.path.join(folder_path, filename)
-        format_ext = os.path.splitext(path)[1]
-        start_time = time.time()
-        try:
-            res = evaluate_photo_quality(path, requested_metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
-            end_time = time.time()
-            
-            scored_images.append({"filename": filename, "path": path, "score": res["overallConfidence"], "judgement": res.get("judgement", "Unknown")})
-            
-            # Performance & Extensive Tracking
-            cam_info = res.get("cameraInfo", {})
-            analytics.track_performance((end_time - start_time) * 1000)
-            analytics.track_analysis_results(
-                judgement=res.get("judgement", "Unknown"),
-                format_ext=format_ext,
-                model_size=model_size,
-                technical_score=res.get("technicalScore", 0),
-                aesthetic_score=res.get("aestheticScore", 0),
-                overall_score=res.get("overallConfidence", 0),
-                camera_make=cam_info.get("make"),
-                camera_model=cam_info.get("model"),
-                lens_model=cam_info.get("lens")
-            )
-            if enable_subject_detection:
-                analytics.track_feature_usage("subject_detection")
 
-        except Exception as e:
-            analytics.track_error(type(e).__name__)
-            logger.error(f"Failed to analyze {filename}: {e}")
-            continue
-        gc.collect()
-            
-    rejects = []
-    if keep_best_n is not None:
-        scored_images.sort(key=lambda x: x["score"], reverse=True)
-        rejects = scored_images[keep_best_n:]
-    else:
-        rejects = [img for img in scored_images if img["score"] < threshold]
+    image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
+    if not image_files: return {"message": "No images found."}
+
+    total_images = len(image_files)
+    paginated_files = image_files[offset : offset + limit]
+    if not paginated_files: return {"message": "No more images.", "totalImages": total_images}
+
+    # Setup directories
+    target_subdir = "selects" if is_threshold_mode else "kept_photos"
+    reject_subdir = "rejects" if is_threshold_mode else "culled_photos"
+    target_dir = os.path.join(folder_path, target_subdir)
+    reject_dir = os.path.join(folder_path, reject_subdir)
+    
+    if mode in ["move", "both"]:
+        os.makedirs(target_dir, exist_ok=True)
+        os.makedirs(reject_dir, exist_ok=True)
+
+    raw_results = _batch_executor(folder_path, paginated_files, metrics, enable_subject_detection, model_size, fast_mode)
+    
+    culled_items = []
+    kept_items = []
+    
+    for res in raw_results:
+        if "error" in res: continue
+        filename = res["filename"]
+        path = res["path"]
+        score = res["overallConfidence"]
         
-    culled_results = []
-    if rejects:
-        culled_dir = os.path.join(folder_path, "culled_photos")
-        if mode in ["move", "both"] and not os.path.exists(culled_dir):
-            os.makedirs(culled_dir)
+        is_select = score >= threshold
+        dest_dir = target_dir if is_select else reject_dir
+        actions = []
+
+        if mode in ["xmp", "both"]:
+            status = "Keep" if is_select else "Rejected"
+            create_xmp_sidecar(path, status, score)
+            actions.append("XMP-Tagged")
             
-        for img in rejects:
-            status_actions = []
-            if mode in ["xmp", "both"]:
-                create_xmp_sidecar(img["path"], "Rejected", img["score"])
-                status_actions.append("XMP-Tagged")
-                analytics.track_feature_usage("xmp_sidecar")
-            if mode in ["move", "both"]:
-                try:
-                    dest = os.path.join(culled_dir, img["filename"])
-                    shutil.move(img["path"], dest)
-                    xmp_path = os.path.splitext(img["path"])[0] + ".xmp"
-                    if os.path.exists(xmp_path):
-                        shutil.move(xmp_path, os.path.join(culled_dir, os.path.basename(xmp_path)))
-                    status_actions.append("Moved")
-                except Exception as e:
-                    logger.error(f"Failed to move {img['filename']}: {e}")
-                    status_actions.append("Move-Failed")
-            culled_results.append({"filename": img["filename"], "score": round(img["score"], 2), "actions": status_actions})
-            
-    summary_msg = f"SUCCESS: Analyzed {len(image_files)} photos. Culled {len(culled_results)} images into '{mode}' state."
-    return {
-        "status": "Action Complete",
-        "message": summary_msg,
-        "totalImagesScanned": len(image_files),
-        "culledCount": len(culled_results)
+        if mode in ["move", "both"]:
+            try:
+                shutil.move(path, os.path.join(dest_dir, filename))
+                xmp_path = os.path.splitext(path)[0] + ".xmp"
+                if os.path.exists(xmp_path):
+                    shutil.move(xmp_path, os.path.join(dest_dir, os.path.basename(xmp_path)))
+                actions.append("Moved")
+            except Exception as e:
+                logger.error(f"Move failed for {filename}: {e}")
+                actions.append("Move-Failed")
+        
+        item = {"filename": filename, "score": round(score, 3), "actions": actions}
+        if is_select: kept_items.append(item)
+        else: culled_items.append(item)
+
+    status_msg = "Threshold Culling Complete" if is_threshold_mode else "Culling Complete"
+    response = {
+        "status": status_msg,
+        "totalImagesInFolder": total_images,
+        "processed": len(raw_results),
+        "keptCount": len(kept_items),
+        "rejectedCount": len(culled_items),
+        "offset": offset,
+        "limit": limit,
+        "resultsSample": (kept_items + culled_items)[:10]
     }
+    if offset + limit < total_images:
+        response["nextOffset"] = offset + limit
+    
+    analytics.transmit_telemetry()
+    return response
 
 @mcp.tool()
 def photographi_analyze_photo(
     image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")],
-    metrics: Annotated[list[str], Field(description="Optional: specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition). Defaults to all.")] = None,
-    enable_subject_detection: Annotated[bool, Field(description="Enables YOLO26 for Subject-Aware Metering, ROI focus analysis, and scene content labeling.")] = True,
-    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size. 'nano' is sub-second.")] = "nano"
+    metrics: Annotated[list[str], Field(description="Specific metrics (sharpness, exposure, noise, focus, color, dynamicRange, composition).")] = None,
+    enable_subject_detection: bool = True,
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
+    fast_mode: Annotated[bool, Field(description="Set to True for faster analysis by downsampling high-res images.")] = False
 ) -> dict:
-    """
-    Performs Studio-Grade technical analysis on a single photo.
-    
-    Science:
-    - Exposure: Evaluated via the Ansel Adams Zone System.
-    - Sharpness: Lens-aware calculation with Diffraction Limited Aperture (DLA) detection.
-    - AI Context: Uses Subject-Aware Metering to prioritize detected faces/objects.
-    """
+    """Performs Studio-Grade technical analysis on a single photo."""
     analytics.track_tool_invocation("photographi_analyze_photo")
-    return _analyze_photo_logic(image_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+    return _analyze_photo_logic(image_path, metrics, enable_subject_detection, model_size, fast_mode)
 
 @mcp.tool()
 def photographi_analyze_folder(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
-    metrics: Annotated[list[str], Field(description="Metrics to calculate.")] = None,
-    enable_subject_detection: bool = True,
+    metrics: Annotated[list[str], Field(description="Specific metrics to calculate (sharpness, exposure, etc.). Defaults to all.")] = None,
+    enable_subject_detection: Annotated[bool, Field(description="Use AI for subject-aware analysis.")] = True,
     model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
-    limit: Annotated[int, Field(description="Max images to process.")] = 10,
-    offset: Annotated[int, Field(description="Pagination offset.")] = 0
+    limit: Annotated[int, Field(description="Batch size for pagination.")] = 10,
+    offset: Annotated[int, Field(description="Pagination offset. Increment this by 'limit' to see more results.")] = 0,
+    fast_mode: Annotated[bool, Field(description="Enabled by default. Set to False for 'Forensic Precision' (full-res analysis, much slower on 40MP+).")] = True
 ) -> dict:
     """
-    Batch analyzes a folder with pagination.
-    Returns technical quality reports for the batch.
+    Batch analyzes a folder with high concurrency (4-8 images at once).
+    Use 'limit' and 'offset' to manage large folders. If 'nextOffset' is present in the response, 
+    call this tool again with that offset to continue analysis.
     """
     analytics.track_tool_invocation("photographi_analyze_folder")
-    return _analyze_folder_logic(folder_path, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size, limit=limit, offset=offset)
+    return _analyze_folder_logic(folder_path, metrics, enable_subject_detection, model_size, limit, offset, fast_mode)
 
 @mcp.tool()
 def photographi_rank_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
     top_n: Annotated[int, Field(description="Number of top-rated images to return.")] = 1,
-    limit: Annotated[int, Field(description="Max images to process to avoid timeout (default 50).")] = 50,
+    limit: Annotated[int, Field(description="Max images to evaluate in this batch.")] = 50,
     offset: Annotated[int, Field(description="Pagination offset.")] = 0,
-    metrics: list[str] = None,
+    metrics: Annotated[list[str], Field(description="Specific metrics for ranking.")] = None,
     enable_subject_detection: bool = True,
-    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano"
+    model_size: Annotated[Literal["nano", "xlarge"], Field(description="YOLO model size.")] = "nano",
+    fast_mode: Annotated[bool, Field(description="Enabled by default for responsiveness. Set to False for full-resolution forensic evaluation.")] = True
 ) -> dict:
     """
-    Burst Intelligence: Ranks photos by technical quality. 
-    Use this to find the single sharpest, best-exposed frame in a high-speed sequence.
+    Ranks photos by technical quality using high concurrency.
+    Useful for finding the 'best' frame in a high-speed sequence.
+    Supports pagination via 'limit' and 'offset' for large sets.
     """
     analytics.track_tool_invocation("photographi_rank_photographs")
-    return _rank_folder_logic(folder_path, top_n=top_n, limit=limit, offset=offset, metrics=metrics, enable_subject_detection=enable_subject_detection, model_size=model_size)
+    return _rank_folder_logic(folder_path, top_n, limit, offset, metrics, enable_subject_detection, model_size, fast_mode)
 
 @mcp.tool()
 def photographi_cull_photographs(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
-    threshold: float = 0.4,
-    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull mode.")] = "move",
-    enable_subject_detection: bool = True
+    threshold: Annotated[float, Field(description="Overall score threshold (0.0-1.0). Images below this are culled.")] = 0.4,
+    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull action (move files or tag XMP).")] = "move",
+    enable_subject_detection: bool = True,
+    limit: Annotated[int, Field(description="Number of images to cull in this batch.")] = 50,
+    offset: Annotated[int, Field(description="Pagination offset.")] = 0,
+    fast_mode: Annotated[bool, Field(description="Enabled by default. Fast Mode is recommended for initial sorting.")] = True
 ) -> dict:
-    """Filters low-quality images into a 'culled_photos' subfolder."""
-    return _cull_folder_logic(folder_path, threshold, mode=mode, enable_subject_detection=enable_subject_detection)
+    """
+    Filters low-quality images using concurrency.
+    Process folders in batches using 'limit' and 'offset'.
+    Highly concurrent (4-8 images at once).
+    """
+    analytics.track_tool_invocation("photographi_cull_photographs")
+    return _cull_logic(folder_path, threshold, mode, False, None, enable_subject_detection, "nano", limit, offset, fast_mode)
 
 @mcp.tool()
 def photographi_threshold_cull(
     folder_path: Annotated[str, Field(description="Absolute path to folder.")],
-    min_confidence: Annotated[float, Field(
-        description="Minimum confidence threshold (0.0-1.0). Images below this are rejected.",
-        ge=0.0,
-        le=1.0
-    )] = 0.6,
-    mode: Annotated[Literal["move", "xmp", "both"], Field(description="Cull mode.")] = "move",
-    enable_subject_detection: bool = True
+    min_confidence: float = 0.6,
+    mode: Literal["move", "xmp", "both"] = "move",
+    enable_subject_detection: bool = True,
+    limit: int = 50,
+    offset: int = 0,
+    fast_mode: bool = True
 ) -> dict:
-    """Binary culling: sorts into 'selects/' (>= threshold) and 'rejects/' (< threshold)."""
-    return _threshold_cull_logic(folder_path, min_confidence, mode, enable_subject_detection=enable_subject_detection)
+    """Binary threshold culling using concurrency and pagination."""
+    analytics.track_tool_invocation("photographi_threshold_cull")
+    return _cull_logic(folder_path, min_confidence, mode, True, None, enable_subject_detection, "nano", limit, offset, fast_mode)
 
 @mcp.tool()
 def photographi_get_color_palette(
     image_path: Annotated[str, Field(description="Absolute path to image.")],
     colors: int = 5
 ) -> dict:
-    """
-    Extracts a representative color palette using K-Means Clustering.
-    """
+    """Extracts a representative color palette using K-Means Clustering."""
     analytics.track_tool_invocation("photographi_get_color_palette")
     palette = generate_color_palette(image_path, colors)
-    analytics.track_feature_usage("color_palette")
     return {"colors": palette}
 
 @mcp.tool()
 def photographi_get_scene_content(
     image_path: Annotated[str, Field(description="Absolute path to RAW/JPEG/TIFF.")]
 ) -> dict:
-    """
-    Returns a clean list of detected objects (e.g., person, dog, car).
-    Use this for quick scene indexing without full technical analysis.
-    """
+    """Returns a clean list of detected objects (e.g., person, dog, car)."""
     analytics.track_tool_invocation("photographi_get_scene_content")
     try:
         objects = detect_objects(image_path)
-        analytics.track_feature_usage("scene_content")
         return {"objects": objects}
     except Exception as e:
-        logger.error(f"Failed to get scene content: {e}")
         return {"error": str(e)}
 
 def _bulk_palette_logic(folder_path: str, colors: int = 5, limit: int = 20, offset: int = 0) -> dict:
-    """
-    Batch color palette extraction with pagination.
-    """
+    """Logic for batch palette extraction."""
     try:
         folder_path = _validate_path(folder_path, expected_type="dir")
     except ValueError as e:
         return {"error": str(e)}
-        
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
-    if not image_files:
-        return {"message": "No images found."}
-
-    # Apply pagination
+    if not image_files: return {"message": "No images found."}
     total_images = len(image_files)
     paginated_files = image_files[offset : offset + limit]
+    if not paginated_files: return {"message": "No more images.", "totalImages": total_images}
     
-    if not paginated_files:
-        return {
-            "message": "No more images in this range.",
-            "totalImages": total_images,
-            "nextOffset": None
-        }
-        
     results = {}
-    
     for filename in paginated_files:
-        image_path = os.path.join(folder_path, filename)
         try:
-            palette = generate_color_palette(image_path, colors)
-            results[filename] = palette
-            analytics.track_feature_usage("color_palette")
+            results[filename] = generate_color_palette(os.path.join(folder_path, filename), colors)
         except Exception as e:
-            logger.error(f"Failed to extract palette for {filename}: {e}")
             results[filename] = {"error": str(e)}
             
-    analytics.transmit_telemetry()
-    
-    response = {
-        "status": "Palette Extraction Complete",
-        "totalImagesInFolder": total_images,
-        "returned": len(results),
-        "offset": offset,
-        "limit": limit,
-        "palettes": results
-    }
-
-    if offset + limit < total_images:
-        response["nextOffset"] = offset + limit
-        response["note"] = f"Showing images {offset + 1} to {offset + len(results)} of {total_images}. Use offset={offset+limit} for next batch."
-        
+    response = {"status": "Complete", "totalImages": total_images, "returned": len(results), "offset": offset, "palettes": results}
+    if offset + limit < total_images: response["nextOffset"] = offset + limit
     return response
 
 @mcp.tool()
@@ -652,26 +442,16 @@ def photographi_get_folder_palettes(
     limit: int = 20,
     offset: int = 0
 ) -> dict:
-    """
-    Extracts representative color palettes for a batch of images in a folder.
-    Supports pagination for large folders.
-    """
+    """Batch color palette extraction with pagination."""
     analytics.track_tool_invocation("photographi_get_folder_palettes")
     return _bulk_palette_logic(folder_path, colors, limit, offset)
-
 
 def main():
     parser = argparse.ArgumentParser(description="Photographi MCP Server")
     parser.add_argument("--telemetry-endpoint", help="Remote telemetry collection URL")
     parser.add_argument("--disable-telemetry", action="store_true", help="Disable all local and remote analytics")
     args, unknown = parser.parse_known_args()
-    
-    # Configure analytics from CLI args
-    analytics.configure(
-        endpoint=args.telemetry_endpoint,
-        disabled=True if args.disable_telemetry else None
-    )
-    
+    analytics.configure(endpoint=args.telemetry_endpoint, disabled=True if args.disable_telemetry else None)
     mcp.run()
 
 if __name__ == "__main__":

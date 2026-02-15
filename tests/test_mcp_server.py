@@ -82,7 +82,7 @@ class TestMCPServerRanking(unittest.TestCase):
         # Verify structure
         self.assertEqual(result['status'], 'Ranking Complete')
         self.assertIn('bestImages', result)
-        self.assertIn('scanned', result)
+        self.assertIn('processed', result)
         
         # Verify each ranked image has a summary
         for image in result['bestImages']:

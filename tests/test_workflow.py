@@ -2,7 +2,7 @@ import pytest
 import os
 import shutil
 from pathlib import Path
-from server import _analyze_folder_logic, _rank_folder_logic, _cull_folder_logic
+from server import _analyze_folder_logic, _rank_folder_logic, _cull_logic
 
 def test_master_workflow(test_assets_dir):
     """
@@ -20,13 +20,13 @@ def test_master_workflow(test_assets_dir):
     # 2. Pagination Stability Test
     # Scan with limit=2, offset=0
     resp1 = _analyze_folder_logic(str(test_assets_dir), limit=2, offset=0)
-    assert resp1["scanned"] == 2
+    assert resp1["processed"] == 2
     assert "nextOffset" in resp1
     assert resp1["nextOffset"] == 2
     
     # Scan with limit=2, offset=2
     resp2 = _analyze_folder_logic(str(test_assets_dir), limit=2, offset=2)
-    assert resp2["scanned"] >= 2
+    assert resp2["processed"] >= 2
     
     # Ensure they returned different files
     names1 = list(resp1["results"].keys())
@@ -51,9 +51,9 @@ def test_master_workflow(test_assets_dir):
 
     # 4. Culling Workflow
     # We expect 'blur.jpg' and 'dark.jpg' to be culled if threshold is default
-    cull_resp = _cull_folder_logic(str(test_assets_dir), mode="move")
-    assert "culledCount" in cull_resp
-    assert cull_resp["culledCount"] > 0
+    cull_resp = _cull_logic(str(test_assets_dir), mode="move")
+    assert "rejectedCount" in cull_resp
+    assert cull_resp["rejectedCount"] > 0
     
     # Verify file system changes
     culled_dir = test_assets_dir / "culled_photos"
@@ -91,10 +91,10 @@ def test_large_pagination_stress(tmp_path):
     
     while True:
         resp = _analyze_folder_logic(str(tmp_path), limit=limit, offset=offset)
-        total_found += resp["scanned"]
+        total_found += resp["processed"]
         if "nextOffset" not in resp:
             break
         offset = resp["nextOffset"]
-        assert resp["scanned"] <= limit
+        assert resp["processed"] <= limit
 
     assert total_found == 60
