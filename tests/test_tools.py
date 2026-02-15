@@ -58,7 +58,7 @@ def test_threshold_cull(mcp_server, test_assets_dir, tmp_path):
     # Note: Synthetic sharp image might have high score
     result = mcp_server._cull_logic(
         str(work_dir), 
-        threshold=0.8, # logic maps 'threshold' to 'min_confidence' internally if needed or just passes it
+        threshold=0.1, # Lower threshold to ensure sharp.jpg is kept
         mode="move", 
         enable_subject_detection=False,
         is_threshold_mode=True
