@@ -30,17 +30,40 @@ logger = logging.getLogger("photographi-mcp")
 # Initialize MCP server
 mcp = FastMCP("photographi")
 
+def _validate_path(path: str, must_exist: bool = True, expected_type: Literal["file", "dir", "any"] = "any") -> str:
+    """
+    Validates a file path for security and existence.
+    Returns the absolute path if valid, raises ValueError if not.
+    """
+    if not path:
+        raise ValueError("Path cannot be empty")
+        
+    abs_path = os.path.abspath(os.path.expanduser(path))
+    
+    if must_exist and not os.path.exists(abs_path):
+        raise ValueError(f"Path not found: {path}")
+        
+    if must_exist:
+        if expected_type == "file" and not os.path.isfile(abs_path):
+            raise ValueError(f"Expected file but found directory: {path}")
+        if expected_type == "dir" and not os.path.isdir(abs_path):
+            raise ValueError(f"Expected directory but found file: {path}")
+            
+    return abs_path
+
 def _analyze_photo_logic(image_path: str, metrics: list[str] = None, enable_subject_detection: bool = True, model_size: str = "nano") -> dict:
     """
     Core engine bridge for single image assessment.
     """
-    if not os.path.exists(image_path):
+    try:
+        image_path = _validate_path(image_path, expected_type="file")
+    except ValueError as e:
         analytics.track_error()
-        return {"error": f"File not found: {image_path}"}
+        return {"error": str(e)}
         
     # Resolve relocated model path
     model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources", "models")
-    model_filename = "yolo11n.pt" if model_size == "nano" else "yolo12x.pt"
+    model_filename = "yolo26n.onnx" if model_size == "nano" else "yolo11x.onnx"
     full_model_path = os.path.join(model_dir, model_filename)
     
     # Check if we have a local model, otherwise fallback to name-only for potential download
@@ -93,8 +116,10 @@ def _analyze_folder_logic(folder_path: str, metrics: list[str] = None, enable_su
     """
     Batch processing pipeline for directory-scale analysis with pagination.
     """
-    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return {"error": f"Directory not found: {folder_path}"}
+    try:
+        folder_path = _validate_path(folder_path, expected_type="dir")
+    except ValueError as e:
+        return {"error": str(e)}
     
     # Sort for stability
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
@@ -176,10 +201,12 @@ def _rank_folder_logic(folder_path: str, top_n: int = 10, limit: int = 50, offse
     """
     Burst-selection Intelligence: Finding the sharpest needle in the haystack.
     """
-    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return {"error": f"Directory not found: {folder_path}"}
-    
-    # Sort for consistent pagination
+    try:
+        folder_path = _validate_path(folder_path, expected_type="dir")
+    except ValueError as e:
+        return {"error": str(e)}
+
+    # Ensure subfolders exististent pagination
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
     if not image_files:
         return {"message": "No images found."}
@@ -377,6 +404,10 @@ def _cull_folder_logic(folder_path: str, threshold: float = 0.4, keep_best_n: in
     """
     if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
         return {"error": "Directory not found."}
+    try:
+        folder_path = _validate_path(folder_path, expected_type="dir")
+    except ValueError as e:
+        return {"error": str(e)}
         
     image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS)]
     if not image_files:
@@ -565,8 +596,10 @@ def _bulk_palette_logic(folder_path: str, colors: int = 5, limit: int = 20, offs
     """
     Batch color palette extraction with pagination.
     """
-    if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
-        return {"error": f"Directory not found: {folder_path}"}
+    try:
+        folder_path = _validate_path(folder_path, expected_type="dir")
+    except ValueError as e:
+        return {"error": str(e)}
         
     image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(SUPPORTED_EXTENSIONS) and not f.startswith(".")])
     if not image_files:
