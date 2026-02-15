@@ -63,7 +63,7 @@ pip install photographi-mcp
 
 Restart Claude Desktop after saving the configuration.
 
-📖 **Detailed Guide**: See [docs/CLAUDE_DESKTOP_SETUP.md](docs/CLAUDE_DESKTOP_SETUP.md)
+📖 **Detailed Guide**: See [docs/setup.md](docs/setup.md)
 
 ---
 
@@ -189,7 +189,7 @@ To disable all telemetry (both local logging and remote transmission), you can e
 ```
 
 > **Note:**
-> **Open Source Security**: For the official release, we use a **Telemetry Relay** (proxy) to securely manage Axiom tokens. If you are forking this project, see [`docs/telemetry_relay.js`](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry_relay.js) for instructions on how to set up your own secure metrics relay.
+> **Open Source Security**: For the official release, we use a **Telemetry Relay** (proxy) to securely manage Axiom tokens. If you are forking this project, see [`docs/telemetry-relay.js`](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry-relay.js) for instructions on how to set up your own secure metrics relay.
 
 ---
 
@@ -197,9 +197,9 @@ To disable all telemetry (both local logging and remote transmission), you can e
 
 ## 📚 Documentation
 
-*   **[Full Tool Reference (API)](docs/api.md)**: Detailed breakdown of every tool, parameter, and return type.
+*   **[Full Tool Reference (API)](docs/api-reference.md)**: Detailed breakdown of every tool, parameter, and return type.
 *   **[System Architecture](docs/architecture.md)**: Deep dive into the Physics/Neural engines and the Privacy-First Telemetry design.
-*   **[Telemetry Relay Setup](docs/telemetry_relay.js)**: Instructions for self-hosting the privacy proxy on Cloudflare.
+*   **[Telemetry Relay Setup](docs/telemetry-relay.js)**: Instructions for self-hosting the privacy proxy on Cloudflare.
 
 ---
 

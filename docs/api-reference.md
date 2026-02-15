@@ -27,7 +27,7 @@ Performs Studio-Grade technical analysis on a single photo.
 ---
 
 ## `photographi_analyze_folder`
-Batch processes an entire folder. Returns a statistical sample (capped at 50 for performance).
+Batch processes an entire folder. Returns technical quality reports for the batch.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -35,16 +35,20 @@ Batch processes an entire folder. Returns a statistical sample (capped at 50 for
 | `metrics` | `list[str]` | `None` | Same as `analyze_photo`. |
 | `enable_subject_detection` | `bool` | `true` | Same as `analyze_photo`. |
 | `model_size` | `str` | `"nano"` | `"nano"` or `"xlarge"`. |
+| `limit` | `int` | `10` | Max images to process per call. |
+| `offset` | `int` | `0` | Starting index for pagination. |
 
 ---
 
 ## `photographi_rank_photographs`
-Ranks a group of photos by `overallConfidence`. Ideal for finding the "keeper" in a burst sequence.
+Burst Intelligence: Ranks photos by technical quality. Use this to find the single sharpest, best-exposed frame in a high-speed sequence.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path to the directory. |
-| `top_n` | `int` | `10` | The number of top-scored images to return. |
+| `top_n` | `int` | `1` | The number of top-rated images to return. |
+| `limit` | `int` | `50` | Max images to process to avoid timeout. |
+| `offset` | `int` | `0` | Pagination offset. |
 | `metrics` | `list[str]` | `None` | Optional metric subset. |
 | `enable_subject_detection` | `bool` | `true` | If true, prioritizes sharp eyes/faces. |
 | `model_size` | `str` | `"nano"` | `"nano"` or `"xlarge"`. |
@@ -52,38 +56,47 @@ Ranks a group of photos by `overallConfidence`. Ideal for finding the "keeper" i
 ---
 
 ## `photographi_threshold_cull`
-Binary culling: Sorts images based on a strict numerical quality threshold.
+Binary culling: sorts into `selects/` (>= threshold) and `rejects/` (< threshold).
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path to the directory. |
 | `min_confidence` | `float` | `0.6` | Images >= this score go to `selects/`. Others to `rejects/`. |
-| `mode` | `str` | `"move"` | `"move"` (physically move files), `"xmp"` (tag metadata), or `"both"`. |
-| `enable_subject_detection` | `bool` | `true` | If true, prioritized sharp eyes/faces. |
+| `mode` | `str` | `"move"` | `"move"`, `"xmp"`, or `"both"`. |
+| `enable_subject_detection` | `bool` | `true` | Enables subject-aware thresholding. |
 
 ---
 
 ## `photographi_cull_photographs`
-Qualitative culling: Filters low-quality assets into a `culled_photos/` subfolder.
+Filters low-quality images into a `culled_photos/` subfolder.
 
-### `photographi_get_folder_palettes`
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `folder_path` | `str` | *Required* | Absolute path to the directory. |
+| `threshold` | `float` | `0.4` | Scores below this are considered "junk". |
+| `mode` | `str` | `"move"` | `"move"`, `"xmp"`, or `"both"`. |
+| `enable_subject_detection` | `bool" | `true` | Enables subject-aware culling. |
+
+---
+
+## `photographi_get_folder_palettes`
 Analyzes an entire folder and returns individual color palettes. Supports pagination.
-
-**Parameters:**
-- `folder_path` (string, required): Absolute path to the directory.
-- `colors` (integer, optional): Number of colors per palette. Default: 5.
-- `limit` (integer, optional): Max images to process per call. Default: 20.
-- `offset` (integer, optional): Starting index for pagination. Default: 0.
-
-**Example Prompt:**
-> "Extract 5-color palettes for the first 50 images in the 'vacation' folder."
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `folder_path` | `str` | *Required* | Absolute path. |
-| `threshold` | `float` | `0.4` | Scores below this are considered "junk". |
-| `mode` | `str` | `"move"` | `"move"`, `"xmp"`, or `"both"`. |
-| `enable_subject_detection` | `bool` | `true` | If true, prioritized sharp eyes/faces. |
+| `colors` | `int` | `5` | Number of colors per palette. |
+| `limit` | `int` | `20` | Max images per call. |
+| `offset` | `int` | `0` | Starting index for pagination. |
+
+---
+
+## `photographi_get_scene_content`
+Quick scene intelligence without full technical analysis.
+
+| Parameter | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `image_path` | `str` | *Required* | Absolute path to RAW, JPEG, or TIFF. |
 
 ---
 

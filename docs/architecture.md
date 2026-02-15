@@ -12,7 +12,7 @@ flowchart TD
     
     subgraph "Core Engine"
         Core -->|FFT| Physics["Physics (Signal Processing)"]
-        Core -->|Inference| Neural["Neural (YOLO11n/x)"]
+        Core -->|Inference| Neural["Neural (YOLO26n / YOLO11x)"]
         Physics -->|Metrics| Fusion[Decision Fusion]
         Neural -->|Context| Fusion
     end
@@ -40,7 +40,7 @@ The heavy lifting is delegated to **[photo-quality-analyzer-core](https://pypi.o
 
 ### B. Neural (Context)
 *   **Dual-Model Architecture**:
-    *   **YOLO11n (Nano)**: Sub-second inference for rapid culling.
+    *   **YOLO26n (Nano)**: Sub-second inference for rapid culling and indexing.
     *   **YOLO11x (XLarge)**: Studio-grade precision for critical audits.
 *   **Subject-Awareness**: Metrics are weighted based on detected subjects (e.g., focus on eyes > background).
 
@@ -53,7 +53,7 @@ We implement a "Trustless" architecture for usage metrics.
 2.  **No PII**: We intentionally do not collect filenames, paths, or EXIF serial numbers.
 3.  **Secure Relay**:
     *   The open-source code **does not** contain API keys.
-    *   Data is sent to a **[Cloudflare Worker Relay](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry_relay.js)** (proxy).
+    *   Data is sent to a **[Cloudflare Worker Relay](https://github.com/prasadabhishek/photographi-mcp/blob/mainline/docs/telemetry-relay.js)** (proxy).
     *   The Relay injects the secret Axiom Token, ensuring the keys never live on the user's machine.
 
 ---
@@ -61,6 +61,9 @@ We implement a "Trustless" architecture for usage metrics.
 ## 3. The MCP Layer
 The server exposes high-level tools (not resources) to the AI Agent.
 
-*   **`photographi_analyze_photo`**: The primary atomic unit of work.
-*   **`photographi_analyze_folder`**: A statistical sampling wrapper.
-*   **`photographi_cull_photographs`**: An orchestrated workflow that combines analysis with filesystem actions.
+*   **`photographi_analyze_photo`**: Atomic technical audit of a single image.
+*   **`photographi_analyze_folder`**: Statistical sampling and bulk quality reporting.
+*   **`photographi_rank_photographs`**: Burst intelligence for selecting the sharpest frame.
+*   **`photographi_cull_photographs`**: Orchestrated movement of low-quality assets.
+*   **`photographi_threshold_cull`**: Strict binary selection based on quality scores.
+*   **`photographi_get_scene_content`**: Rapid indexing of people, animals, and objects.
