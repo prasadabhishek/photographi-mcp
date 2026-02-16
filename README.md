@@ -67,15 +67,18 @@ Here are real examples from actual photo analysis:
 
 ## 🛠️ Tools (MCP)
 
-`photographi-mcp` exposes several tools for your AI:
-- **`photographi_analyze_photo`**: Deep technical audit of a single image.
-- **`photographi_analyze_folder`**: Statistical quality report for a folder.
-- **`photographi_rank_photographs`**: Ranks photos by technical perfection (ideal for bursts).
-- **`photographi_cull_photographs`**: Moves low-quality photos to a `culled_photos` folder.
-- **`photographi_threshold_cull`**: Strict "Keep/Toss" sorting based on score.
-- **`photographi_get_color_palette`**: Extracts dominant color palettes from an image.
-- **`photographi_get_folder_palettes`**: Batch color extraction for an entire folder.
-- **`photographi_get_scene_content`**: Identifies key objects (people, animals, etc.).
+`photographi-mcp` enables AI models to perform deep technical audits through these standardized tools:
+
+| Tool | AI "Intent" Example | Action / Insight Provided |
+| :--- | :--- | :--- |
+| `analyze_photo` | "Is this dog photo sharp enough for a print?" | Full technical audit of sharpness, focus, and lighting. |
+| `analyze_folder` | "How's the overall quality of my 'Vacation' folder?" | Statistical summary identifying the best/worst image groups. |
+| `rank_photographs` | "Find the best shot in this burst of the cake." | Ranks files by technical perfection to find the "hero" frame. |
+| `cull_photographs` | "Move all the blurry photos to a junk folder." | Automatically cleans up failed shots into a subfolder. |
+| `threshold_cull` | "Strictly separate keepers using a score of 0.7." | Binary sorting to isolate professional-grade assets. |
+| `get_color_palette` | "What colors are in this sunset for my website?" | Extracts hexadecimal codes for dominant image aesthetics. |
+| `get_folder_palettes` | "Generate a moodboard from my 'Forest' shoot." | Batch color extraction for an entire folder. |
+| `get_scene_content` | "Which photos contain a 'cat' or 'mountain'?" | Rapid content indexing based on 80+ object categories. |
 
 **[Full API Reference](docs/api-reference.md)**
 
