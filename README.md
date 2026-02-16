@@ -1,7 +1,7 @@
 # photographi-mcp
 **Fast, private, and grounded technical photo analysis for AI applications.**
 
-`photographi-mcp` is an MCP server that enables AI models and LLM-powered tools to perform technical analysis on local photo libraries. It runs computer vision models directly on your hardware to evaluate sharpness, focus, and exposure—enabling capabilities like automated culling, burst ranking, and metadata indexing without requiring a cloud upload.
+`photographi-mcp` is an MCP server that enables AI models and LLM-powered tools to perform technical analysis on local photo libraries. It runs computer vision models directly on your hardware (powered by **[photo-quality-analyzer-core](https://github.com/prasadabhishek/photo-quality-analyzer)**) to evaluate sharpness, focus, and exposure—enabling capabilities like automated culling, burst ranking, and metadata indexing without requiring a cloud upload.
 
 ### ⚡ Why photographi?
 - **Technical First**: Purpose-built for objective metrics (sharpness, lighting, focus). It provides technical data for evaluating image quality.
