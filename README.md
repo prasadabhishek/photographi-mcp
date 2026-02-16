@@ -141,6 +141,7 @@ Add to `~/.config/github-copilot/config.json`:
   <p>
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Compatible-green.svg" alt="MCP Protocol"></a>
+    <a href="https://glama.ai/mcp/servers/@prasadabhishek/photographi-mcp"><img width="380" height="200" src="https://glama.ai/mcp/servers/@prasadabhishek/photographi-mcp/badge" /></a>
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
   </p>
   <p>Built with ❤️ for photographers</p>
